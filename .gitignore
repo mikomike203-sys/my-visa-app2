@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.playwright-mcp/
+.vscode/
+*.log
+*.png
+build_output*.txt
+dev_output.txt
+tsc_output.txt
