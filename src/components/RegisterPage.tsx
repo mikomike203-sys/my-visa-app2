@@ -22,9 +22,11 @@ export function RegisterPage({ onSwitchToLogin }: Props) {
     setError("");
     setLoading(true);
     try {
+      sessionStorage.setItem("visa-show-wallet-splash", "true");
       await register(email, password, fullName);
       localStorage.setItem("pending-card-look", cardLook);
     } catch (err: any) {
+      sessionStorage.removeItem("visa-show-wallet-splash");
       setError(err.message || "Registration failed");
     } finally {
       setLoading(false);
@@ -34,8 +36,10 @@ export function RegisterPage({ onSwitchToLogin }: Props) {
   const handleGoogleLogin = async () => {
     setError("");
     try {
+      sessionStorage.setItem("visa-show-wallet-splash", "true");
       await loginWithGoogle();
     } catch (err: any) {
+      sessionStorage.removeItem("visa-show-wallet-splash");
       setError(err.message || "Google sign up failed. Check Supabase and Google OAuth settings.");
     }
   };

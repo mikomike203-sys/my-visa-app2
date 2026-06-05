@@ -19,8 +19,10 @@ export function LoginPage({ onSwitchToRegister }: Props) {
     setError("");
     setLoading(true);
     try {
+      sessionStorage.setItem("visa-show-wallet-splash", "true");
       await login(email, password);
     } catch (err: any) {
+      sessionStorage.removeItem("visa-show-wallet-splash");
       setError(err.message || "Login failed");
     } finally {
       setLoading(false);
@@ -30,8 +32,10 @@ export function LoginPage({ onSwitchToRegister }: Props) {
   const handleGoogleLogin = async () => {
     setError("");
     try {
+      sessionStorage.setItem("visa-show-wallet-splash", "true");
       await loginWithGoogle();
     } catch (err: any) {
+      sessionStorage.removeItem("visa-show-wallet-splash");
       setError(err.message || "Google login failed. Check Supabase and Google OAuth settings.");
     }
   };

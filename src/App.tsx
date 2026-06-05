@@ -76,11 +76,11 @@ function App() {
     if (!user) {
       setHasShownWalletSplash(false);
       setShowWalletSplash(false);
+      sessionStorage.removeItem("visa-show-wallet-splash");
       return;
     }
-    const splashKey = `visa-splash-shown-${user.id}`;
-    if (sessionStorage.getItem(splashKey)) {
-      setHasShownWalletSplash(true);
+    const shouldShowSplash = sessionStorage.getItem("visa-show-wallet-splash") === "true";
+    if (!shouldShowSplash) {
       setShowWalletSplash(false);
       return;
     }
@@ -89,7 +89,7 @@ function App() {
     const timer = window.setTimeout(() => {
       setShowWalletSplash(false);
       setHasShownWalletSplash(true);
-      sessionStorage.setItem(splashKey, "true");
+      sessionStorage.removeItem("visa-show-wallet-splash");
     }, 3300);
     return () => window.clearTimeout(timer);
   }, [hasShownWalletSplash, loading, user]);
