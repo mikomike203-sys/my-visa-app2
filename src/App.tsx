@@ -78,11 +78,18 @@ function App() {
       setShowWalletSplash(false);
       return;
     }
+    const splashKey = `visa-splash-shown-${user.id}`;
+    if (sessionStorage.getItem(splashKey)) {
+      setHasShownWalletSplash(true);
+      setShowWalletSplash(false);
+      return;
+    }
     if (loading || hasShownWalletSplash) return;
     setShowWalletSplash(true);
     const timer = window.setTimeout(() => {
       setShowWalletSplash(false);
       setHasShownWalletSplash(true);
+      sessionStorage.setItem(splashKey, "true");
     }, 3300);
     return () => window.clearTimeout(timer);
   }, [hasShownWalletSplash, loading, user]);
@@ -294,7 +301,11 @@ function App() {
     </div>
   );
 
-  if (loading || showWalletSplash) {
+  if (loading) {
+    return <div className="min-h-dvh bg-black" />;
+  }
+
+  if (showWalletSplash) {
     return walletSplash;
   }
 
@@ -322,7 +333,12 @@ function App() {
   }
 
   return (
-    <div className="min-h-dvh bg-white">
+    <motion.div
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.48, ease: [0.16, 1, 0.3, 1] }}
+      className="min-h-dvh bg-white"
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
         * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
@@ -405,7 +421,7 @@ function App() {
         <NotificationSheet open={showNotifications} currency={currency} transactions={transactions} kycStatus={profile?.kyc_status || "not_submitted"} onClose={closeNotifications} />
         <AddCardSheet open={showAddCard} userId={user.id} email={user.email || ""} cardColor={cardColor} cardPattern={cardPattern} cardCount={userCards.length} onCreateCard={handleCreateCard} onClose={closeAddCard} />
       </div>
-    </div>
+    </motion.div>
   );
 }
 

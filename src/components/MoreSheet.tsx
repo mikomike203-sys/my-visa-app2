@@ -84,15 +84,42 @@ export function MoreSheet({
             className="relative w-full max-w-[430px] max-h-[92dvh] overflow-y-auto rounded-t-3xl bg-white p-4 min-[390px]:p-6 pb-[max(24px,env(safe-area-inset-bottom))]"
           >
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-extrabold text-black">Settings</h3>
+              <div>
+                <h3 className="text-lg font-extrabold text-black">Settings</h3>
+                <p className="text-xs font-bold text-slate-500">Cards, limits, KYC, and wallet controls</p>
+              </div>
               <button onClick={onClose} className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
                 <X className="w-4 h-4 text-black" />
               </button>
             </div>
 
             <div className="space-y-5">
+              <div className="rounded-[24px] border border-black bg-black p-4 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-white/50">Wallet status</p>
+                    <p className="mt-1 text-lg font-black">{kycStatus === "verified" ? "Verified account" : "Verification needed"}</p>
+                    <p className="mt-1 text-xs font-bold text-white/60">{userCards.length} active card{userCards.length === 1 ? "" : "s"} - {people.length} profiles available</p>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-black">
+                    <ShieldCheck className="h-6 w-6" />
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  {[
+                    { label: "Send", action: () => { onSend(); onClose(); } },
+                    { label: "Add card", action: () => { onAddCard(); onClose(); } },
+                    { label: "Share", action: onOpenShare },
+                  ].map((item) => (
+                    <button key={item.label} onClick={item.action} className="rounded-xl border border-white/15 bg-white/10 px-2 py-2 text-[10px] font-black text-white">
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Currency */}
-              <div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <label className="text-xs font-bold text-slate-600 mb-2 block">Currency</label>
                 <div className="flex gap-2">
                   {currencies.map((c) => (
@@ -101,7 +128,7 @@ export function MoreSheet({
                       onClick={() => onCurrencyChange(c.value)}
                       className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                         currency === c.value
-                          ? "bg-blue-600 text-white shadow-md"
+                          ? "bg-blue-600 text-white"
                           : "bg-slate-100 text-slate-600"
                       }`}
                     >
@@ -112,7 +139,7 @@ export function MoreSheet({
               </div>
 
               {/* Hide Balance */}
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50">
+              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4">
                 <div className="flex items-center gap-3">
                   {hideBalance ? <EyeOff className="w-5 h-5 text-slate-600" /> : <Eye className="w-5 h-5 text-slate-600" />}
                   <div>
@@ -132,7 +159,7 @@ export function MoreSheet({
                 </button>
               </div>
 
-              <div className="rounded-2xl border border-black bg-white p-4 shadow-[4px_4px_0_#000]">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <UsersRound className="h-4 w-4 text-black" />
@@ -158,7 +185,7 @@ export function MoreSheet({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-black bg-white p-4 shadow-[4px_4px_0_#000]">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <Palette className="h-4 w-4 text-black" />
                   <p className="text-sm font-black text-black">Card look</p>
@@ -175,7 +202,7 @@ export function MoreSheet({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-black bg-white p-4 shadow-[4px_4px_0_#000]">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <h4 className="mb-3 text-sm font-black text-black">Why Visa Limit Card</h4>
                 <div className="grid grid-cols-2 gap-2">
                   {[
@@ -195,7 +222,7 @@ export function MoreSheet({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-black bg-white p-4 shadow-[4px_4px_0_#000]">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <CreditCard className="h-4 w-4 text-black" />
@@ -217,7 +244,7 @@ export function MoreSheet({
                 )}
               </div>
 
-              <div className="rounded-2xl border border-black bg-[#f7f7f4] p-4">
+              <div className="rounded-2xl border border-slate-200 bg-[#f7f7f4] p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <KeyRound className="h-4 w-4 text-black" />
                   <p className="text-sm font-black text-black">Financial security</p>
@@ -247,7 +274,7 @@ export function MoreSheet({
                 {passwordMessage && <p className="mt-2 text-xs font-bold text-slate-600">{passwordMessage}</p>}
               </div>
 
-              <div className="rounded-2xl border border-black bg-[#f7f7f4] p-4">
+              <div className="rounded-2xl border border-slate-200 bg-[#f7f7f4] p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <BadgeCheck className="h-4 w-4 text-black" />

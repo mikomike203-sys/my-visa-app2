@@ -3,9 +3,7 @@ import {
   ArrowRight,
   BarChart3,
   Check,
-  CreditCard,
   Landmark,
-  LockKeyhole,
   PieChart,
   ScanLine,
   ShieldCheck,
@@ -113,41 +111,19 @@ export function LandingPage({ onGetStarted, onSignIn }: Props) {
             </div>
 
             <motion.div
-              initial={{ opacity: 0, rotate: -2, y: 20 }}
+              initial={{ opacity: 0, rotate: -1, y: 20 }}
               animate={{ opacity: 1, rotate: 0, y: 0 }}
               transition={{ delay: 0.18 }}
-              className="relative mx-auto w-full max-w-[470px]"
+              className="relative mx-auto w-full max-w-[560px]"
             >
-              <div className="rounded-[32px] border border-black bg-[#d7ff5f] p-4 shadow-[10px_10px_0_#000]">
-                <div className="rounded-[26px] border border-black bg-white p-5">
-                  <div className="mb-5 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-black uppercase text-zinc-500">Total Balance</p>
-                      <p className="text-4xl font-black tracking-tight">KSh 482,900</p>
-                    </div>
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-black bg-black text-white">
-                      <CreditCard className="h-6 w-6" />
-                    </div>
-                  </div>
-                  <div className="rounded-[24px] border border-black bg-gradient-to-br from-zinc-950 via-zinc-800 to-blue-700 p-5 text-white shadow-lg">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black uppercase opacity-70">Visa Kenya</span>
-                      <LockKeyhole className="h-5 w-5 opacity-80" />
-                    </div>
-                    <p className="mt-12 font-mono text-xl tracking-[0.18em]">4829 1604 2098</p>
-                    <div className="mt-6 flex items-end justify-between text-xs font-black uppercase">
-                      <span>Mike Main</span>
-                      <span>09/28</span>
-                    </div>
-                  </div>
-                  <div className="mt-5 grid grid-cols-3 gap-3">
-                    {["Send", "Scan", "Audit"].map((item) => (
-                      <div key={item} className="rounded-2xl border border-black bg-zinc-50 px-3 py-4 text-center text-xs font-black">
-                        {item}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              <div className="overflow-hidden rounded-[32px] border border-black bg-white shadow-[10px_10px_0_#000]">
+                <img
+                  src="/landing-payment.jpg"
+                  alt="Tap to pay with card and phone"
+                  className="w-full object-cover"
+                  loading="eager"
+                  decoding="async"
+                />
               </div>
             </motion.div>
           </div>
