@@ -38,7 +38,7 @@ export function FloatingNav({ activeTab, onTabChange, onMoreOpen }: Props) {
                 >
                   {isActive && <motion.div layoutId="footerActive" className="absolute w-10 h-10 rounded-2xl border border-black bg-[#d7ff5f] shadow-[3px_3px_0_#000]" transition={{ type: "spring", stiffness: 500, damping: 30 }} />}
                   <Icon
-                    className={`w-[22px] h-[22px] relative z-10 transition-all duration-300 ${isActive ? "text-black dark-nav-active" : "text-zinc-600 dark-nav-icon"}`}
+                    className={`w-[22px] h-[22px] relative z-10 transition-all duration-300 ${isActive ? "text-black" : "text-zinc-600"}`}
                     strokeWidth={isActive ? 3 : 2.55}
                     fill={isActive ? "currentColor" : "none"}
                   />
@@ -46,7 +46,7 @@ export function FloatingNav({ activeTab, onTabChange, onMoreOpen }: Props) {
               );
             })}
             <motion.button whileTap={{ scale: 0.85 }} onClick={onMoreOpen} className="relative flex items-center justify-center h-12 rounded-2xl cursor-pointer select-none" aria-label="More">
-              <Menu className="w-[22px] h-[22px] relative z-10 text-zinc-700 dark-nav-icon" strokeWidth={2.7} />
+              <Menu className="w-[22px] h-[22px] relative z-10 text-zinc-700" strokeWidth={2.7} />
             </motion.button>
           </div>
         </motion.div>

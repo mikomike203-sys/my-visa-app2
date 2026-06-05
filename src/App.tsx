@@ -48,7 +48,6 @@ function App() {
   const [cardColor, setCardColor] = useState<CardColor>("graphite");
   const [cardPattern, setCardPattern] = useState<CardPattern>("solid");
   const [hideBalance, setHideBalance] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [userCards, setUserCards] = useState<Card[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [people, setPeople] = useState<PublicPerson[]>([]);
@@ -95,16 +94,6 @@ function App() {
       .then((data) => setPeople(data.people || []))
       .catch((err) => console.error("Failed to load people:", err));
   }, [user]);
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("visa-theme") as "light" | "dark" | null;
-    if (savedTheme) setTheme(savedTheme);
-  }, []);
-
-  const handleThemeChange = useCallback((nextTheme: "light" | "dark") => {
-    setTheme(nextTheme);
-    localStorage.setItem("visa-theme", nextTheme);
-  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -333,7 +322,7 @@ function App() {
   }
 
   return (
-    <div data-theme={theme} className="min-h-dvh bg-white transition-colors duration-300">
+    <div className="min-h-dvh bg-white">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
         * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
@@ -402,9 +391,7 @@ function App() {
         <ReceiveSheet open={showReceive} currency={currency} email={user.email || ""} fullName={profile?.full_name || ""} walletAddress={user.id} onClose={closeReceive} onSendToMe={(target) => { setSendRecipient(target); setShowReceive(false); setShowSend(true); }} />
         <MoreSheet
           open={showMore} currency={currency} cardColor={cardColor} cardPattern={cardPattern} hideBalance={hideBalance}
-          theme={theme}
           onCurrencyChange={handleCurrencyChange} onCardColorChange={handleCardColorChange} onCardPatternChange={setCardPattern}
-          onThemeChange={handleThemeChange}
           onHideBalanceChange={handleHideBalanceChange} onClose={closeMore} onNavigate={handleNavigate}
           onAddCard={openAddCard} onSend={openSend}
           userCards={userCards}

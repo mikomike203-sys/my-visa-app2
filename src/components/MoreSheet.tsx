@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { X, LogOut, Share2, Eye, EyeOff, Send, PlusCircle, BadgeCheck, Palette, ShieldCheck, Zap, QrCode, CreditCard, KeyRound, Smartphone, Gauge, Moon, Sun, UsersRound } from "lucide-react";
+import { X, LogOut, Share2, Eye, EyeOff, Send, PlusCircle, BadgeCheck, Palette, ShieldCheck, Zap, QrCode, CreditCard, KeyRound, Smartphone, Gauge, UsersRound } from "lucide-react";
 import type { Currency } from "../utils/currency";
 import type { CardColor, CardPattern } from "./Card3D";
 import type { Card, PublicPerson } from "../types/database";
@@ -19,9 +19,7 @@ interface Props {
   cardColor: CardColor;
   cardPattern: CardPattern;
   hideBalance: boolean;
-  theme: "light" | "dark";
   onCurrencyChange: (c: Currency) => void;
-  onThemeChange: (theme: "light" | "dark") => void;
   onCardColorChange: (c: CardColor) => void;
   onCardPatternChange: (c: CardPattern) => void;
   onHideBalanceChange: (h: boolean) => void;
@@ -38,8 +36,8 @@ interface Props {
 }
 
 export function MoreSheet({
-  open, currency, cardColor, cardPattern, hideBalance, theme,
-  onCurrencyChange, onThemeChange, onCardColorChange, onCardPatternChange,
+  open, currency, cardColor, cardPattern, hideBalance,
+  onCurrencyChange, onCardColorChange, onCardPatternChange,
   onHideBalanceChange, onClose, onNavigate, onAddCard, onSend, userCards, people, onOpenShare, onLogout,
   onSubmitKyc, kycStatus
 }: Props) {
@@ -94,27 +92,6 @@ export function MoreSheet({
 
             <div className="space-y-5">
               {/* Currency */}
-              <div className="rounded-2xl border border-black bg-white p-3 shadow-[4px_4px_0_#000]">
-                <label className="text-xs font-bold text-slate-600 mb-2 block">Theme</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: "Light", value: "light" as const, icon: Sun },
-                    { label: "Dark", value: "dark" as const, icon: Moon },
-                  ].map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <button
-                        key={item.value}
-                        onClick={() => onThemeChange(item.value)}
-                        className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-black ${theme === item.value ? "border-black bg-[#d7ff5f] text-black shadow-[2px_2px_0_#000]" : "border-slate-200 bg-white text-slate-600"}`}
-                      >
-                        <Icon className="h-4 w-4" /> {item.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               <div>
                 <label className="text-xs font-bold text-slate-600 mb-2 block">Currency</label>
                 <div className="flex gap-2">

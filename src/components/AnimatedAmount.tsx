@@ -10,18 +10,21 @@ interface Props {
 }
 
 export function AnimatedAmount({ value, currency, className = "", minimumFractionDigits }: Props) {
-  const motionValue = useMotionValue(0);
-  const [display, setDisplay] = useState(formatMoney(0, currency, { minimumFractionDigits }));
-  const previousValue = useRef(0);
-  const direction = value >= previousValue.current ? -1 : 1;
+  const motionValue = useMotionValue(value);
+  const previousValue = useRef(value);
+  const [display, setDisplay] = useState(formatMoney(value, currency, { minimumFractionDigits }));
+  const [direction, setDirection] = useState(0);
 
   useEffect(() => {
+    const nextDirection = value >= previousValue.current ? -1 : 1;
+    setDirection(nextDirection);
+
     const unsubscribe = motionValue.on("change", (latest) => {
       setDisplay(formatMoney(latest, currency, { minimumFractionDigits }));
     });
 
     const controls = animate(motionValue, value, {
-      duration: 1.15,
+      duration: 0.9,
       ease: [0.16, 1, 0.3, 1],
     });
     previousValue.current = value;
@@ -34,22 +37,13 @@ export function AnimatedAmount({ value, currency, className = "", minimumFractio
 
   return (
     <motion.span
-      className={`inline-flex overflow-hidden align-baseline ${className}`}
-      initial={false}
-      animate={{ scale: [1, 1.018, 1] }}
-      transition={{ duration: 0.45 }}
+      key={`${currency}-${value}-${minimumFractionDigits ?? "auto"}`}
+      className={`inline-block whitespace-nowrap ${className}`}
+      initial={{ y: direction * 10, opacity: 0.7 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
     >
-      {display.split("").map((char, index) => (
-        <motion.span
-          key={`${char}-${index}-${display}`}
-          initial={{ y: direction * 18, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.34, delay: Math.min(index * 0.012, 0.16), ease: [0.16, 1, 0.3, 1] }}
-          className="inline-block"
-        >
-          {char === " " ? "\u00a0" : char}
-        </motion.span>
-      ))}
+      {display}
     </motion.span>
   );
 }
