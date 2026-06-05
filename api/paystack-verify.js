@@ -56,7 +56,9 @@ module.exports = async function handler(req, res) {
       }, { onConflict: "user_id,signature" })
       .select()
       .single();
-    if (methodError) throw methodError;
+    const paymentMethod = methodError ? null : method;
+    const paymentMethodMissing = methodError && /payment_methods|schema cache|does not exist|relation/i.test(methodError.message || "");
+    if (methodError && !paymentMethodMissing) throw methodError;
 
     const amountUsd = Number(tx.metadata?.amountUsd || 0);
     await supabase.from("transactions").insert({
@@ -68,7 +70,7 @@ module.exports = async function handler(req, res) {
       currency: "USD",
       description: `Paystack card authorization ${reference}`,
       recipient_email: null,
-      recipient_name: method ? `${method.card_type || "Card"} ending ${method.last4 || "****"}` : null,
+      recipient_name: `${authorization.card_type || authorization.brand || "Card"} ending ${authorization.last4 || "****"}`,
       status: "completed",
     });
 
@@ -83,10 +85,10 @@ module.exports = async function handler(req, res) {
     if (createVirtualCard) {
       await supabase.from("cards").insert({
         user_id: userId,
-        label: `${method.card_type || "Paystack"} ${method.last4 || "Card"}`,
-        card_number: `**** **** **** ${method.last4 || "0000"}`,
+        label: `${authorization.card_type || authorization.brand || "Paystack"} ${authorization.last4 || "Card"}`,
+        card_number: `**** **** **** ${authorization.last4 || "0000"}`,
         card_holder: tx.customer?.email || "Visa Kenya",
-        expiry: `${method.exp_month || "00"}/${method.exp_year || "00"}`,
+        expiry: `${authorization.exp_month || "00"}/${authorization.exp_year || "00"}`,
         balance: 0,
         color: "graphite",
         frozen: false,
@@ -94,7 +96,7 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    res.status(200).json({ ok: true, paymentMethod: method, amountUsd });
+    res.status(200).json({ ok: true, paymentMethod, amountUsd, savedAuthorization: !paymentMethodMissing });
   } catch (error) {
     res.status(400).json({ error: error.message || "Payment verification failed" });
   }

@@ -120,7 +120,7 @@ export function AnalyticsScreen({ currency, transactions, onNotifications }: Pro
             })}
           </div>
 
-          <div className="px-4 min-[390px]:px-6 mb-5">
+          <div className="px-4 min-[390px]:px-6 mb-5 min-w-0">
             <div className="rounded-3xl border border-slate-200 bg-white p-4">
               <div className="mb-4 flex items-center justify-between">
                 <div>
@@ -129,8 +129,8 @@ export function AnalyticsScreen({ currency, transactions, onNotifications }: Pro
                 </div>
                 <WalletCards className="h-5 w-5 text-black" />
               </div>
-              <div className="h-52">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-52 min-h-[208px] min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <BarChart data={byDay} barGap={5}>
                     <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#64748b", fontWeight: 700 }} />
                     <YAxis hide />
@@ -143,11 +143,11 @@ export function AnalyticsScreen({ currency, transactions, onNotifications }: Pro
             </div>
           </div>
 
-          <div className="px-4 min-[390px]:px-6 mb-5 grid grid-cols-2 gap-3">
-            <div className="rounded-3xl border border-slate-200 bg-white p-4">
+          <div className="px-4 min-[390px]:px-6 mb-5 grid min-w-0 grid-cols-2 gap-3">
+            <div className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4">
               <h3 className="text-sm font-black text-black">Breakdown</h3>
-              <div className="mt-3 h-36">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="mt-3 h-36 min-h-[144px] min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <PieChart>
                     <Pie data={categories} innerRadius={38} outerRadius={58} dataKey="value" stroke="none">
                       {categories.map((entry) => <Cell key={entry.name} fill={categoryColors[entry.name] || "#64748b"} />)}
