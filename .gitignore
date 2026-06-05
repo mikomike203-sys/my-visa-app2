@@ -7,3 +7,7 @@ dist/
 build_output*.txt
 dev_output.txt
 tsc_output.txt
+.env
+.env.*
+
+.vercel

@@ -1,38 +1,18 @@
-import { motion } from "framer-motion";
-import { Bell, Headphones, Plus, ArrowUpRight, ChevronRight, Send, Download } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useState } from "react";
+import { Bell, Headphones, Plus, ArrowUpRight, ChevronRight, Send, Download, LogOut, ReceiptText, RotateCcw, LockKeyhole } from "lucide-react";
 import { Card3D } from "./Card3D";
 import type { CardColor, CardPattern } from "./Card3D";
 import { TransactionIcon } from "./TransactionIcon";
 import type { IconName } from "./icons/FintechIcons";
-import { Currency, formatMoney } from "../utils/currency";
+import { Currency, formatMoney, toBaseCurrency } from "../utils/currency";
+import type { Card, Transaction } from "../types/database";
 
 const quickActions: { icon: IconName; label: string; action?: string }[] = [
   { icon: "send", label: "Send", action: "send" },
   { icon: "receive", label: "Receive", action: "receive" },
   { icon: "wallet", label: "Top Up" },
-  { icon: "bills", label: "Bills" },
-];
-
-interface TxItem {
-  id: number;
-  name: string;
-  category: string;
-  amount: number;
-  date: string;
-  icon: IconName;
-}
-
-const recentTx: TxItem[] = [
-  { id: 1, name: "Amazon.com", category: "Shopping", amount: -89.71, date: "Today, 2:14 PM", icon: "shopping" },
-  { id: 2, name: "Starbucks", category: "Food & Drink", amount: -6.40, date: "Today, 9:42 AM", icon: "restaurant" },
-  { id: 3, name: "Salary Deposit", category: "Income", amount: 4500.0, date: "Yesterday", icon: "income" },
-  { id: 4, name: "Netflix", category: "Entertainment", amount: -15.99, date: "Yesterday", icon: "streaming" },
-];
-
-const features: { icon: IconName; title: string; desc: string }[] = [
-  { icon: "card", title: "Bank-Grade Security", desc: "256-bit encryption protects every transaction" },
-  { icon: "recurring", title: "Instant Transfers", desc: "Send money anywhere in seconds" },
-  { icon: "coins", title: "Cashback Rewards", desc: "Earn up to 5% on every purchase" },
+  { icon: "bills", label: "Withdraw" },
 ];
 
 interface Props {
@@ -40,44 +20,159 @@ interface Props {
   cardColor: CardColor;
   cardPattern: CardPattern;
   hideBalance: boolean;
-  onSend: () => void;
+  greeting: string;
+  userCards: Card[];
+  activeCardIndex: number;
+  balance: number;
+  fullName: string;
+  email: string;
+  avatarUrl: string;
+  kycStatus: "pending" | "verified" | "rejected" | "not_submitted";
+  transactions: Transaction[];
+  onToggleFreeze: (cardId: string, frozen: boolean) => void;
+  onCardChange: (index: number) => void;
+  onSend: (recipient?: string) => void;
   onReceive: () => void;
+  onTopUp: (amount: number, reference: string) => Promise<void>;
   onAddCard: () => void;
   onNotifications: () => void;
+  onLogout: () => void;
 }
 
-export function HomeScreen({ currency, cardColor, cardPattern, hideBalance, onSend, onReceive, onAddCard, onNotifications }: Props) {
+export function HomeScreen({
+  currency, cardColor, cardPattern, hideBalance, greeting, userCards,
+  activeCardIndex, balance, fullName, email, avatarUrl, kycStatus, transactions,
+  onSend, onReceive, onTopUp, onAddCard, onNotifications, onLogout
+}: Props) {
+  const [topUpError, setTopUpError] = useState("");
+  const [showTopUp, setShowTopUp] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState("");
+  const [receiptTx, setReceiptTx] = useState<Transaction | null>(null);
+  const [withdrawMessage, setWithdrawMessage] = useState("");
+
+  const startTopUp = () => {
+    const displayAmount = Number(topUpAmount);
+    const amountUsd = toBaseCurrency(displayAmount, currency);
+    if (!Number.isFinite(displayAmount) || amountUsd < 5) {
+      setTopUpError(`Top up must be at least ${formatMoney(5, currency)}.`);
+      return;
+    }
+    fetch("/api/paystack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: email || "wallet@visakenya.app",
+        amountUsd,
+        callbackUrl: window.location.origin,
+        metadata: { kind: "wallet_topup" },
+      }),
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not start transaction");
+        sessionStorage.setItem("pendingTopupUsd", String(amountUsd));
+        sessionStorage.setItem("pendingTopupReference", data.reference);
+        setShowTopUp(false);
+        setTopUpAmount("");
+        setTopUpError("");
+        window.location.href = data.authorizationUrl;
+      })
+      .catch((err) => setTopUpError(err.message || "Could not start transaction"));
+  };
+
+  const recentTx = transactions.slice(0, 5).map(t => ({
+    id: t.id,
+    name: t.type === "receive"
+      ? `Confirmed you received from ${t.recipient_name || "someone"}`
+      : t.type === "send"
+        ? `Sent to ${t.recipient_name || "recipient"}`
+        : t.description || t.type,
+    subtitle: t.type === "receive"
+      ? "Money received"
+      : t.type === "send"
+        ? "Money sent"
+        : t.description || t.type,
+    category: t.type,
+    amount: t.type === "receive" || t.type === "topup" ? t.amount : -t.amount,
+    date: new Date(t.created_at).toLocaleDateString(),
+    icon: (t.type === "send" ? "send" : t.type === "receive" ? "income" : t.type === "payment" ? "shopping" : "card") as IconName,
+    avatarUrl: t.recipient_avatar_url,
+    person: t.recipient_name || t.recipient_email,
+  }));
+  const previousRecipients = Array.from(new Map(
+    transactions
+      .filter((t) => t.type === "send" && (t.recipient_email || t.recipient_name))
+      .map((t) => [t.recipient_email || t.recipient_name || t.id, t])
+  ).values()).slice(0, 6);
+
+  const downloadReceipt = (tx: Transaction) => {
+    const content = [
+      "Visa Kenya Receipt",
+      `Transaction: ${tx.id}`,
+      `Type: ${tx.type}`,
+      `Amount: ${formatMoney(tx.amount, currency)}`,
+      `Description: ${tx.description || "N/A"}`,
+      `Recipient: ${tx.recipient_name || tx.recipient_email || "N/A"}`,
+      `Date: ${new Date(tx.created_at).toLocaleString()}`,
+      `Status: ${tx.status}`,
+    ].join("\n");
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `visa-kenya-receipt-${tx.id}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="pb-44 bg-white">
       {/* Header */}
       <div className="px-6 pt-6 pb-5 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold text-black tracking-tight">Sarah Mitchell</h1>
+          <h1 className="text-2xl font-extrabold text-black tracking-tight">{greeting}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{fullName}</p>
         </div>
         <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center cursor-pointer">
-            <Headphones className="w-[18px] h-[18px] text-black" strokeWidth={2.5} />
-          </div>
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={fullName} className="h-10 w-10 rounded-2xl border border-black object-cover" />
+          ) : (
+            <div className="h-10 w-10 rounded-2xl border border-black bg-[#d7ff5f] flex items-center justify-center text-sm font-black text-black">{fullName.charAt(0) || "V"}</div>
+          )}
+          <button onClick={onLogout} className="w-10 h-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center cursor-pointer hover:bg-red-50 hover:border-red-200 transition-colors">
+            <LogOut className="w-[18px] h-[18px] text-slate-600" strokeWidth={2.5} />
+          </button>
           <div className="relative">
             <button onClick={onNotifications} className="w-10 h-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center cursor-pointer">
               <Bell className="w-[18px] h-[18px] text-black" strokeWidth={2.5} />
             </button>
-            <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-black rounded-full border-2 border-white" />
           </div>
         </div>
       </div>
 
-      {/* 3D Card (black/grey/silver) */}
-      <div className="home-card-wrap px-4 min-[390px]:px-6 mb-5">
-        <Card3D colorTheme={cardColor} patternTheme={cardPattern} balance={hideBalance ? "******" : undefined} />
+      {/* Balance */}
+      <div className="px-6 mb-4">
+        <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Total Balance</p>
+        <p className="font-mono text-4xl font-black text-black tracking-tight mt-1 tabular-nums">
+          {hideBalance ? "******" : formatMoney(balance, currency)}
+        </p>
       </div>
 
-      {/* Add Card button only */}
+      {/* 3D Card */}
+      <div className="home-card-wrap px-4 min-[390px]:px-6 mb-5">
+        <Card3D
+          color={(userCards[activeCardIndex]?.color as CardColor) || cardColor}
+          cardNumber={userCards[activeCardIndex]?.card_number}
+          cardHolder={userCards[activeCardIndex]?.card_holder || fullName}
+          cardExpiry={userCards[activeCardIndex]?.expiry}
+          balance={balance}
+          currency={currency}
+          hideBalance={hideBalance}
+        />
+      </div>
+
+      {/* Add Card button */}
       <div className="px-4 min-[390px]:px-6 mb-5">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-bold text-black uppercase tracking-wider">My Cards</h3>
-          <span className="text-[10px] font-semibold text-slate-400">Tap to manage</span>
-        </div>
         <motion.button
           whileTap={{ scale: 0.96 }}
           onClick={onAddCard}
@@ -97,7 +192,7 @@ export function HomeScreen({ currency, cardColor, cardPattern, hideBalance, onSe
         </motion.button>
       </div>
 
-      {/* Quick Actions (B&W) */}
+      {/* Quick Actions */}
       <div className="quick-actions px-4 min-[390px]:px-6 mb-6">
         <div className="grid grid-cols-4 gap-3">
           {quickActions.map((action) => (
@@ -107,7 +202,10 @@ export function HomeScreen({ currency, cardColor, cardPattern, hideBalance, onSe
               onClick={() => {
                 if (action.action === "send") onSend();
                 else if (action.action === "receive") onReceive();
-                else if (action.action === "addCard") onAddCard();
+                else if (action.label === "Top Up") setShowTopUp(true);
+                else if (action.label === "Withdraw") {
+                  setWithdrawMessage(kycStatus === "verified" ? "Withdrawals are coming next." : "Submit and verify KYC to unlock withdrawals.");
+                }
               }}
               className="flex flex-col items-center gap-2 py-3.5 px-2 rounded-2xl bg-white border border-slate-200 cursor-pointer select-none hover:border-blue-500 hover:bg-blue-50 transition-colors"
             >
@@ -116,9 +214,37 @@ export function HomeScreen({ currency, cardColor, cardPattern, hideBalance, onSe
             </motion.button>
           ))}
         </div>
+        {topUpError && <p className="mt-3 text-xs font-bold text-red-500">{topUpError}</p>}
+        {withdrawMessage && <p className="mt-3 text-xs font-bold text-amber-700">{withdrawMessage}</p>}
       </div>
 
-      {/* Quick action row with Send/Receive (B&W) */}
+      {previousRecipients.length > 0 && (
+        <div className="px-6 mb-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-extrabold text-black">Send again</h3>
+            <RotateCcw className="h-4 w-4 text-black" />
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+            {previousRecipients.map((tx) => {
+              const recipient = tx.recipient_email || tx.recipient_name || "";
+              return (
+              <button key={tx.id} onClick={() => onSend(recipient)} className="min-w-[72px] text-center">
+                <div className="mx-auto mb-1 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-black bg-[#d7ff5f] text-sm font-black text-black">
+                  {tx.recipient_avatar_url ? (
+                    <img src={tx.recipient_avatar_url} alt={tx.recipient_name || recipient} className="h-full w-full object-cover" />
+                  ) : (
+                    (tx.recipient_name || tx.recipient_email || "?").charAt(0).toUpperCase()
+                  )}
+                </div>
+                <p className="truncate text-[10px] font-bold text-black">{tx.recipient_name || tx.recipient_email}</p>
+              </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Send/Receive buttons */}
       <div className="px-6 mb-6 flex gap-2.5">
         <motion.button
           whileTap={{ scale: 0.97 }}
@@ -152,56 +278,42 @@ export function HomeScreen({ currency, cardColor, cardPattern, hideBalance, onSe
           </button>
         </div>
         <div className="space-y-2.5">
+          {recentTx.length === 0 && (
+            <p className="text-sm text-slate-400 text-center py-8">No transactions yet</p>
+          )}
           {recentTx.map((tx) => {
             const isPositive = tx.amount > 0;
             return (
               <motion.div
                 key={tx.id}
+                onClick={() => setReceiptTx(transactions.find((item) => item.id === tx.id) || null)}
                 whileTap={{ scale: 0.98, y: 1 }}
                 transition={{ type: "spring", stiffness: 500, damping: 25 }}
                 className="flex items-center gap-3 p-3.5 rounded-2xl bg-white border border-slate-200 cursor-pointer"
               >
-                <TransactionIcon icon={tx.icon} size={20} color="#000000" />
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-black bg-[#d7ff5f]">
+                  {tx.avatarUrl ? (
+                    <img src={tx.avatarUrl} alt={tx.person || tx.category} className="h-full w-full object-cover" />
+                  ) : tx.person ? (
+                    <span className="text-sm font-black text-black">{tx.person.charAt(0).toUpperCase()}</span>
+                  ) : (
+                    <TransactionIcon icon={tx.icon} size={20} color="#000000" />
+                  )}
+                </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-black truncate">
+                  <p className="text-sm font-bold text-black truncate capitalize">
                     {tx.name}
                   </p>
                   <p className="text-[10px] text-slate-500">
-                    {tx.category} - {tx.date}
+                    {tx.subtitle} - {tx.date}
                   </p>
                 </div>
-                <p
-                  className={`text-sm font-extrabold ${isPositive ? "text-emerald-600" : "text-red-500"}`}
-                >
+                <p className={`font-mono text-sm font-black tabular-nums ${isPositive ? "text-emerald-600" : "text-red-500"}`}>
                   {isPositive ? "+" : "-"}{formatMoney(Math.abs(tx.amount), currency)}
                 </p>
               </motion.div>
             );
           })}
-        </div>
-      </div>
-
-      {/* Features */}
-      <div className="px-6 mb-6">
-        <h3 className="text-sm font-extrabold text-black mb-4">Why Visa Limit Card</h3>
-        <div className="space-y-3">
-          {features.map((feat) => (
-            <motion.div
-              key={feat.title}
-              whileTap={{ scale: 0.98 }}
-              className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-slate-200"
-            >
-              <TransactionIcon icon={feat.icon} size={22} color="#000000" />
-              <div>
-                <p className="text-sm font-extrabold text-black mb-0.5">
-                  {feat.title}
-                </p>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  {feat.desc}
-                </p>
-              </div>
-            </motion.div>
-          ))}
         </div>
       </div>
 
@@ -218,9 +330,50 @@ export function HomeScreen({ currency, cardColor, cardPattern, hideBalance, onSe
           <ChevronRight className="w-5 h-5 text-white" strokeWidth={2.5} />
         </motion.button>
       </div>
+      <AnimatePresence>
+        {showTopUp && (
+          <div className="fixed inset-0 z-[130] flex items-end justify-center">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/40" onClick={() => setShowTopUp(false)} />
+            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="relative w-full max-w-[430px] max-h-[92dvh] overflow-y-auto rounded-t-3xl bg-white p-4 min-[390px]:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-black text-black">Top up with Paystack</h3>
+                  <p className="text-xs font-bold text-slate-500">Minimum amount is {formatMoney(5, currency)}</p>
+                </div>
+                <button onClick={() => setShowTopUp(false)} className="rounded-xl bg-slate-100 p-2"><Plus className="h-4 w-4 rotate-45 text-black" /></button>
+              </div>
+              <input value={topUpAmount} onChange={(e) => setTopUpAmount(e.target.value)} type="number" min={5} step="0.01" placeholder="Enter amount" className="mb-3 w-full rounded-2xl border border-black px-4 py-4 text-2xl font-black text-black outline-none" />
+              {topUpError && <p className="mb-3 text-xs font-bold text-red-500">{topUpError}</p>}
+              <button onClick={startTopUp} className="w-full rounded-2xl border border-black bg-[#d7ff5f] py-4 text-sm font-black text-black shadow-[4px_4px_0_#000]">Continue to Paystack</button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {receiptTx && (
+          <div className="fixed inset-0 z-[130] flex items-end justify-center">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/40" onClick={() => setReceiptTx(null)} />
+            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="relative w-full max-w-[430px] max-h-[92dvh] overflow-y-auto rounded-t-3xl bg-white p-4 min-[390px]:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-black text-black">Receipt</h3>
+                  <p className="text-xs font-bold text-slate-500">{new Date(receiptTx.created_at).toLocaleString()}</p>
+                </div>
+                <ReceiptText className="h-6 w-6 text-black" />
+              </div>
+              <div className="space-y-3 rounded-2xl border border-black bg-[#f7f7f4] p-4 text-sm font-bold text-black">
+                <p>{receiptTx.type === "receive" ? `Confirmed you received from ${receiptTx.recipient_name || "sender"}` : receiptTx.type === "send" ? `Confirmed you sent to ${receiptTx.recipient_name || "recipient"}` : `Type: ${receiptTx.type}`}</p>
+                <p>Amount: {formatMoney(receiptTx.amount, currency)}</p>
+                <p>Status: {receiptTx.status}</p>
+                <p>Details: {receiptTx.description || "N/A"}</p>
+              </div>
+              <button onClick={() => downloadReceipt(receiptTx)} className="mt-4 w-full rounded-2xl border border-black bg-[#d7ff5f] py-3 text-sm font-black text-black shadow-[4px_4px_0_#000]">
+                Download receipt
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
-
-
-

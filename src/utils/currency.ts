@@ -1,14 +1,24 @@
-export type Currency = "USD" | "KSH";
+export type Currency = "USD" | "EUR" | "GBP" | "KES" | "NGN";
 
-const KSH_RATE = 129;
+const RATES: Record<string, number> = {
+  USD: 1,
+  EUR: 0.92,
+  GBP: 0.79,
+  KES: 129,
+  NGN: 1500,
+};
+
+export function toBaseCurrency(value: number, currency: Currency) {
+  return value / (RATES[currency] || 1);
+}
 
 export function formatMoney(value: number, currency: Currency, options?: { minimumFractionDigits?: number }) {
-  const amount = currency === "KSH" ? value * KSH_RATE : value;
-  const minimumFractionDigits = options?.minimumFractionDigits ?? (currency === "KSH" ? 0 : 2);
+  const amount = value * (RATES[currency] || 1);
+  const minimumFractionDigits = options?.minimumFractionDigits ?? (currency === "KES" || currency === "NGN" ? 0 : 2);
 
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: currency === "KSH" ? "KES" : "USD",
+    currency: currency === "KES" ? "KES" : currency === "NGN" ? "NGN" : currency,
     currencyDisplay: "narrowSymbol",
     minimumFractionDigits,
     maximumFractionDigits: minimumFractionDigits,

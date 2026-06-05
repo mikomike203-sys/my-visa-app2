@@ -1,92 +1,16 @@
-import { useCallback, type CSSProperties } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, BarChart3, Layers, Send, Shield, Settings, HelpCircle, LogOut, Bell, Receipt, Globe, Zap, Gift, EyeOff } from "lucide-react";
+import { useState } from "react";
+import { X, LogOut, Share2, Eye, EyeOff, Send, PlusCircle, BadgeCheck, Palette, ShieldCheck, Zap, QrCode, CreditCard, KeyRound, Smartphone, Gauge, Moon, Sun, UsersRound } from "lucide-react";
 import type { Currency } from "../utils/currency";
 import type { CardColor, CardPattern } from "./Card3D";
+import type { Card, PublicPerson } from "../types/database";
 
-const cardColorOptions: { id: CardColor; label: string; gradient: string }[] = [
-  { id: "graphite", label: "Silver", gradient: "from-slate-900 via-slate-600 to-slate-300" },
-  { id: "blue", label: "Blue", gradient: "from-slate-950 via-blue-700 to-sky-400" },
-  { id: "green", label: "Green", gradient: "from-slate-950 via-emerald-700 to-lime-300" },
-  { id: "purple", label: "Purple", gradient: "from-slate-950 via-violet-700 to-fuchsia-300" },
-  { id: "rose", label: "Rose", gradient: "from-slate-950 via-rose-700 to-orange-300" },
-];
-
-const cardPatternOptions: { id: CardPattern; label: string; style: CSSProperties }[] = [
-  {
-    id: "spear",
-    label: "Spear",
-    style: {
-      backgroundImage:
-        "linear-gradient(60deg, transparent 0 42%, rgba(250,204,21,0.75) 43% 47%, transparent 48% 100%), linear-gradient(120deg, transparent 0 42%, rgba(255,255,255,0.35) 43% 47%, transparent 48% 100%), linear-gradient(135deg,#020304,#111827)",
-      backgroundSize: "18px 18px, 18px 18px, 100% 100%",
-    },
-  },
-  {
-    id: "shield",
-    label: "Shield",
-    style: {
-      backgroundImage:
-        "radial-gradient(circle at 50% 50%, transparent 0 28%, rgba(250,204,21,0.7) 29% 34%, transparent 35% 100%), linear-gradient(135deg,#020304,#1f2937)",
-      backgroundSize: "24px 24px, 100% 100%",
-    },
-  },
-  {
-    id: "kente",
-    label: "Kente",
-    style: {
-      backgroundImage:
-        "linear-gradient(90deg, rgba(250,204,21,0.65) 2px, transparent 2px), linear-gradient(0deg, rgba(96,165,250,0.45) 2px, transparent 2px), linear-gradient(135deg,#020304,#0f172a)",
-      backgroundSize: "16px 16px, 16px 16px, 100% 100%",
-    },
-  },
-  {
-    id: "panther",
-    label: "Panther",
-    style: {
-      backgroundImage:
-        "radial-gradient(ellipse at 50% 30%, rgba(250,204,21,0.72) 0 16%, transparent 17% 100%), linear-gradient(135deg, transparent 0 42%, rgba(255,255,255,0.3) 43% 46%, transparent 47% 100%), linear-gradient(135deg,#020304,#18181b)",
-      backgroundSize: "28px 20px, 24px 24px, 100% 100%",
-    },
-  },
-  {
-    id: "circuit",
-    label: "Circuit",
-    style: {
-      backgroundImage:
-        "linear-gradient(90deg, rgba(250,204,21,0.55) 1px, transparent 1px), linear-gradient(0deg, rgba(255,255,255,0.3) 1px, transparent 1px), radial-gradient(circle, rgba(250,204,21,0.9) 0 2px, transparent 3px), linear-gradient(135deg,#020304,#172554)",
-      backgroundSize: "18px 18px, 18px 18px, 18px 18px, 100% 100%",
-    },
-  },
-];
-
-const menuSections = [
-  {
-    title: "Account",
-    items: [
-      { id: "analytics", label: "Analytics", icon: BarChart3, desc: "View spending insights" },
-      { id: "cards", label: "Card Management", icon: Layers, desc: "Manage your cards" },
-      { id: "payments", label: "Payments", icon: Send, desc: "Scheduled & recurring" },
-      { id: "transactions", label: "Transactions", icon: Receipt, desc: "Full transaction history" },
-    ],
-  },
-  {
-    title: "Services",
-    items: [
-      { id: "rewards", label: "Rewards", icon: Gift, desc: "Points & cashback" },
-      { id: "bills", label: "Bill Pay", icon: Zap, desc: "Pay bills instantly" },
-      { id: "international", label: "International", icon: Globe, desc: "FX rates & transfers" },
-      { id: "security", label: "Security", icon: Shield, desc: "Protect your account" },
-    ],
-  },
-  {
-    title: "Preferences",
-    items: [
-      { id: "notifications", label: "Notifications", icon: Bell, desc: "Alert preferences" },
-      { id: "settings", label: "Settings", icon: Settings, desc: "App configuration" },
-      { id: "help", label: "Help & Support", icon: HelpCircle, desc: "Get assistance" },
-    ],
-  },
+const currencies: { label: string; value: Currency }[] = [
+  { label: "USD", value: "USD" },
+  { label: "EUR", value: "EUR" },
+  { label: "GBP", value: "GBP" },
+  { label: "KES", value: "KES" },
+  { label: "NGN", value: "NGN" },
 ];
 
 interface Props {
@@ -95,188 +19,321 @@ interface Props {
   cardColor: CardColor;
   cardPattern: CardPattern;
   hideBalance: boolean;
+  theme: "light" | "dark";
+  onCurrencyChange: (c: Currency) => void;
+  onThemeChange: (theme: "light" | "dark") => void;
+  onCardColorChange: (c: CardColor) => void;
+  onCardPatternChange: (c: CardPattern) => void;
+  onHideBalanceChange: (h: boolean) => void;
   onClose: () => void;
-  onCurrencyChange: (currency: Currency) => void;
-  onCardColorChange: (color: CardColor) => void;
-  onCardPatternChange: (pattern: CardPattern) => void;
-  onHideBalanceChange: (hide: boolean) => void;
   onNavigate: (tab: string) => void;
   onAddCard: () => void;
   onSend: () => void;
+  userCards: Card[];
+  people: PublicPerson[];
+  onOpenShare: () => void;
+  onLogout: () => void;
+  onSubmitKyc: (documentUrl: string) => Promise<void>;
+  kycStatus: "pending" | "verified" | "rejected" | "not_submitted";
 }
 
-export function MoreSheet({ open, currency, cardColor, cardPattern, hideBalance, onClose, onCurrencyChange, onCardColorChange, onCardPatternChange, onHideBalanceChange, onNavigate, onAddCard, onSend }: Props) {
-  const handleClose = useCallback(() => {
-    onClose();
-  }, [onClose]);
+export function MoreSheet({
+  open, currency, cardColor, cardPattern, hideBalance, theme,
+  onCurrencyChange, onThemeChange, onCardColorChange, onCardPatternChange,
+  onHideBalanceChange, onClose, onNavigate, onAddCard, onSend, userCards, people, onOpenShare, onLogout,
+  onSubmitKyc, kycStatus
+}: Props) {
+  const [kycDocument, setKycDocument] = useState("");
+  const [kycMessage, setKycMessage] = useState("");
+  const [showCardDetails, setShowCardDetails] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const activeCard = userCards[0];
+  const virtualCvv = activeCard ? String(Math.abs(activeCard.id.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0)) % 900 + 100) : "***";
+  const cardLooks: { label: string; value: CardColor; swatch: string }[] = [
+    { label: "Graphite", value: "graphite", swatch: "bg-zinc-900" },
+    { label: "Sky", value: "sky", swatch: "bg-blue-600" },
+    { label: "Emerald", value: "emerald", swatch: "bg-emerald-600" },
+    { label: "Violet", value: "violet", swatch: "bg-violet-600" },
+    { label: "Rose", value: "rose", swatch: "bg-rose-600" },
+  ];
 
-  const handleItem = useCallback((id: string) => {
-    if (id === "analytics") onNavigate("progress");
-    else if (id === "cards") {
-      onClose();
-      onAddCard();
-    } else if (id === "payments") {
-      onClose();
-      onSend();
-    } else if (id === "transactions") onNavigate("wallet");
-  }, [onAddCard, onClose, onNavigate, onSend]);
+  const submitKyc = async () => {
+    if (!kycDocument.trim()) {
+      setKycMessage("Paste a document link or reference first.");
+      return;
+    }
+    await onSubmitKyc(kycDocument.trim());
+    setKycDocument("");
+    setKycMessage("KYC submitted for admin review.");
+  };
 
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center">
+        <div className="fixed inset-0 z-[120] flex items-end justify-center">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/40"
-            onClick={handleClose}
+            className="absolute inset-0 bg-black/35"
+            onClick={onClose}
           />
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="relative w-full max-w-md bg-white rounded-t-3xl max-h-[85vh] overflow-hidden flex flex-col"
-            style={{ boxShadow: "0 -8px 40px rgba(0,0,0,0.15)" }}
+            className="relative w-full max-w-[430px] max-h-[92dvh] overflow-y-auto rounded-t-3xl bg-white p-4 min-[390px]:p-6 pb-[max(24px,env(safe-area-inset-bottom))]"
           >
-            <div className="flex justify-center pt-3 pb-2">
-              <div className="w-10 h-1 rounded-full bg-slate-200" />
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-extrabold text-black">Settings</h3>
+              <button onClick={onClose} className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
+                <X className="w-4 h-4 text-black" />
+              </button>
             </div>
 
-            <div className="flex items-center justify-between px-6 pb-4">
-              <div>
-                <h2 className="text-lg font-extrabold text-slate-900">More</h2>
-                <p className="text-xs text-slate-400">All features & settings</p>
+            <div className="space-y-5">
+              {/* Currency */}
+              <div className="rounded-2xl border border-black bg-white p-3 shadow-[4px_4px_0_#000]">
+                <label className="text-xs font-bold text-slate-600 mb-2 block">Theme</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: "Light", value: "light" as const, icon: Sun },
+                    { label: "Dark", value: "dark" as const, icon: Moon },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.value}
+                        onClick={() => onThemeChange(item.value)}
+                        className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-black ${theme === item.value ? "border-black bg-[#d7ff5f] text-black shadow-[2px_2px_0_#000]" : "border-slate-200 bg-white text-slate-600"}`}
+                      >
+                        <Icon className="h-4 w-4" /> {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <motion.button
-                whileTap={{ scale: 0.85 }}
-                onClick={handleClose}
-                className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center cursor-pointer"
-              >
-                <X className="w-4 h-4 text-slate-500" />
-              </motion.button>
-            </div>
 
-            <div className="flex-1 overflow-y-auto px-6 pb-8">
-              {menuSections.map((section) => (
-                <div key={section.title} className="mb-6">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">
-                    {section.title}
-                  </p>
-                  <div className="space-y-2">
-                    {section.items.map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <motion.button
-                          key={item.id}
-                          whileTap={{ scale: 0.98, y: 1 }}
-                          onClick={() => handleItem(item.id)}
-                          className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white border border-slate-100 cursor-pointer hover:bg-blue-50 hover:border-blue-100 transition-colors"
-                          style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}
-                        >
-                          <div
-                            className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0"
-                            style={{ boxShadow: "0 2px 6px rgba(0,0,0,0.05)" }}
-                          >
-                            <Icon className="w-5 h-5 text-black" strokeWidth={2.7} />
-                          </div>
-                          <div className="text-left flex-1">
-                            <p className="text-sm font-semibold text-slate-800">{item.label}</p>
-                            <p className="text-[10px] text-slate-400">{item.desc}</p>
-                          </div>
-                          <div className="w-5 h-5 rounded-full bg-slate-50 flex items-center justify-center">
-                            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="text-slate-300">
-                              <path d="M3 1.5L5.5 4L3 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          </div>
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-
-              <div className="mb-6 rounded-2xl bg-blue-50 border border-blue-100 p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center">
-                    <Settings className="w-5 h-5 text-black" strokeWidth={2.7} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-extrabold text-black">Settings</p>
-                    <p className="text-[10px] text-slate-500">Display currency</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white p-1 border border-blue-100">
-                  {(["USD", "KSH"] as Currency[]).map((option) => (
-                    <motion.button
-                      key={option}
-                      whileTap={{ scale: 0.97 }}
-                      onClick={() => onCurrencyChange(option)}
-                      className={`py-2.5 rounded-xl text-xs font-extrabold transition-colors ${
-                        currency === option ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-500"
+              <div>
+                <label className="text-xs font-bold text-slate-600 mb-2 block">Currency</label>
+                <div className="flex gap-2">
+                  {currencies.map((c) => (
+                    <button
+                      key={c.value}
+                      onClick={() => onCurrencyChange(c.value)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                        currency === c.value
+                          ? "bg-blue-600 text-white shadow-md"
+                          : "bg-slate-100 text-slate-600"
                       }`}
                     >
-                      {option}
-                    </motion.button>
+                      {c.label}
+                    </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Hide Balance */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50">
+                <div className="flex items-center gap-3">
+                  {hideBalance ? <EyeOff className="w-5 h-5 text-slate-600" /> : <Eye className="w-5 h-5 text-slate-600" />}
+                  <div>
+                    <p className="text-sm font-bold text-black">Hide Balance</p>
+                    <p className="text-xs text-slate-500">Keep your balance private</p>
+                  </div>
                 </div>
                 <button
                   onClick={() => onHideBalanceChange(!hideBalance)}
-                  className="mt-3 w-full p-3 rounded-2xl bg-white border border-blue-100 flex items-center justify-between"
+                  className={`w-12 h-7 rounded-full transition-all ${
+                    hideBalance ? "bg-blue-600" : "bg-slate-300"
+                  }`}
                 >
-                  <span className="inline-flex items-center gap-2 text-xs font-extrabold text-black">
-                    <EyeOff className="w-4 h-4 text-black" strokeWidth={2.7} />
-                    Hide balance
-                  </span>
-                  <span className={`w-10 h-6 rounded-full p-1 transition-colors ${hideBalance ? "bg-blue-600" : "bg-slate-200"}`}>
-                    <span className={`block w-4 h-4 rounded-full bg-white transition-transform ${hideBalance ? "translate-x-4" : "translate-x-0"}`} />
-                  </span>
+                  <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-all transform ${
+                    hideBalance ? "translate-x-6" : "translate-x-1"
+                  }`} />
                 </button>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-extrabold mt-4 mb-2">Card color</p>
-                <div className="grid grid-cols-5 gap-2">
-                  {cardColorOptions.map((option) => (
-                    <motion.button
-                      key={option.id}
-                      whileTap={{ scale: 0.92 }}
-                      onClick={() => onCardColorChange(option.id)}
-                      className={`h-12 rounded-2xl bg-gradient-to-br ${option.gradient} border-2 transition-all ${
-                        cardColor === option.id ? "border-blue-600 ring-4 ring-blue-200" : "border-white"
-                      }`}
-                      title={option.label}
-                    />
-                  ))}
+              </div>
+
+              <div className="rounded-2xl border border-black bg-white p-4 shadow-[4px_4px_0_#000]">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <UsersRound className="h-4 w-4 text-black" />
+                    <p className="text-sm font-black text-black">People profiles</p>
+                  </div>
+                  <span className="text-[10px] font-black text-slate-500">{people.length} users</span>
                 </div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-extrabold mt-4 mb-2">Card pattern</p>
+                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                  {people.map((person) => (
+                    <div key={person.id} className="w-[92px] shrink-0 text-center">
+                      <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-black bg-[#d7ff5f]">
+                        {person.avatarUrl ? (
+                          <img src={person.avatarUrl} alt={person.fullName} className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-lg font-black text-black">{person.fullName.charAt(0).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <p className="truncate text-xs font-black text-black">{person.fullName}</p>
+                      <p className="truncate text-[10px] font-bold text-slate-500">{person.email}</p>
+                    </div>
+                  ))}
+                  {people.length === 0 && <p className="text-xs font-bold text-slate-500">No people found yet.</p>}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-black bg-white p-4 shadow-[4px_4px_0_#000]">
+                <div className="mb-3 flex items-center gap-2">
+                  <Palette className="h-4 w-4 text-black" />
+                  <p className="text-sm font-black text-black">Card look</p>
+                </div>
                 <div className="grid grid-cols-5 gap-2">
-                  {cardPatternOptions.map((option) => (
-                    <motion.button
-                      key={option.id}
-                      whileTap={{ scale: 0.92 }}
-                      onClick={() => onCardPatternChange(option.id)}
-                      className={`h-12 rounded-2xl border-2 transition-all ${
-                        cardPattern === option.id ? "border-blue-600 ring-4 ring-blue-200" : "border-white"
-                      }`}
-                      style={option.style}
-                      title={option.label}
+                  {cardLooks.map((look) => (
+                    <button
+                      key={look.value}
+                      onClick={() => onCardColorChange(look.value)}
+                      className={`h-12 rounded-2xl border border-black ${look.swatch} ${cardColor === look.value ? "ring-2 ring-[#d7ff5f] ring-offset-2" : ""}`}
+                      aria-label={look.label}
                     />
                   ))}
                 </div>
               </div>
 
-              {/* Log Out */}
-              <motion.button
-                whileTap={{ scale: 0.98 }}
-                className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white border border-slate-200 cursor-pointer"
-              >
-                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-                  <LogOut className="w-5 h-5 text-black" strokeWidth={2.7} />
+              <div className="rounded-2xl border border-black bg-white p-4 shadow-[4px_4px_0_#000]">
+                <h4 className="mb-3 text-sm font-black text-black">Why Visa Limit Card</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { icon: ShieldCheck, label: "KYC secured" },
+                    { icon: Zap, label: "Fast transfers" },
+                    { icon: QrCode, label: "Scan to send" },
+                    { icon: CreditCard, label: "Card looks" },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <div key={item.label} className="rounded-xl border border-black/15 bg-[#f7f7f4] p-3">
+                        <Icon className="mb-2 h-4 w-4 text-black" />
+                        <p className="text-[11px] font-black text-black">{item.label}</p>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="text-left flex-1">
-                  <p className="text-sm font-semibold text-slate-800">Log Out</p>
-                  <p className="text-[10px] text-slate-400">Sign out of your account</p>
+              </div>
+
+              <div className="rounded-2xl border border-black bg-white p-4 shadow-[4px_4px_0_#000]">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-black" />
+                    <p className="text-sm font-black text-black">Card details</p>
+                  </div>
+                  <button onClick={() => setShowCardDetails(!showCardDetails)} className="rounded-xl bg-slate-100 px-3 py-1.5 text-[10px] font-black text-black">
+                    {showCardDetails ? "Hide" : "View"}
+                  </button>
                 </div>
-              </motion.button>
+                {activeCard ? (
+                  <div className="space-y-2 rounded-2xl bg-[#f7f7f4] p-3 font-mono text-xs font-black text-black">
+                    <div className="flex justify-between gap-3"><span className="text-slate-500">Number</span><span>{showCardDetails ? activeCard.card_number : `**** **** **** ${activeCard.card_number.slice(-4)}`}</span></div>
+                    <div className="flex justify-between gap-3"><span className="text-slate-500">Expiry</span><span>{showCardDetails ? activeCard.expiry : "**/**"}</span></div>
+                    <div className="flex justify-between gap-3"><span className="text-slate-500">CVV</span><span>{showCardDetails ? virtualCvv : "***"}</span></div>
+                    <div className="flex justify-between gap-3"><span className="text-slate-500">Holder</span><span className="truncate">{activeCard.card_holder}</span></div>
+                  </div>
+                ) : (
+                  <p className="text-xs font-bold text-slate-500">No card available yet.</p>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-black bg-[#f7f7f4] p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <KeyRound className="h-4 w-4 text-black" />
+                  <p className="text-sm font-black text-black">Financial security</p>
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {[
+                    { icon: KeyRound, label: "Change wallet password", note: "Password reset opens from Supabase email flow" },
+                    { icon: Smartphone, label: "Trusted device session", note: "Stay logged in on this device" },
+                    { icon: Gauge, label: "Transaction controls", note: "Limits, card privacy, and KYC controls" },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.label}
+                        onClick={() => setPasswordMessage(item.note)}
+                        className="flex items-center gap-3 rounded-xl border border-black/10 bg-white p-3 text-left"
+                      >
+                        <Icon className="h-4 w-4 text-black" />
+                        <div>
+                          <p className="text-xs font-black text-black">{item.label}</p>
+                          <p className="text-[10px] font-bold text-slate-500">{item.note}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {passwordMessage && <p className="mt-2 text-xs font-bold text-slate-600">{passwordMessage}</p>}
+              </div>
+
+              <div className="rounded-2xl border border-black bg-[#f7f7f4] p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BadgeCheck className="h-4 w-4 text-black" />
+                    <p className="text-sm font-black text-black">KYC submission</p>
+                  </div>
+                  <span className="rounded-full bg-black px-2 py-1 text-[10px] font-black uppercase text-white">{kycStatus.replace("_", " ")}</span>
+                </div>
+                <input
+                  value={kycDocument}
+                  onChange={(e) => setKycDocument(e.target.value)}
+                  placeholder="Paste document link or ID reference"
+                  className="mb-3 w-full rounded-xl border border-black bg-white px-3 py-2 text-xs font-bold text-black outline-none"
+                />
+                <label className="mb-3 flex cursor-pointer items-center justify-center rounded-xl border border-black bg-white px-3 py-2 text-xs font-black text-black">
+                  Upload or capture document
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setKycDocument(`Uploaded: ${file.name}`);
+                    }}
+                  />
+                </label>
+                <button onClick={submitKyc} className="w-full rounded-xl border border-black bg-[#d7ff5f] py-2 text-xs font-black text-black shadow-[3px_3px_0_#000]">
+                  Submit KYC for review
+                </button>
+                {kycMessage && <p className="mt-2 text-xs font-bold text-slate-600">{kycMessage}</p>}
+              </div>
+
+              {/* Quick Actions */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => { onSend(); onClose(); }}
+                  className="p-3 rounded-xl bg-blue-50 text-blue-700 text-sm font-bold text-left hover:bg-blue-100 transition-colors"
+                >
+                  <Send className="w-4 h-4 inline mr-1" />
+                  Send Money
+                </button>
+                <button
+                  onClick={() => { onAddCard(); onClose(); }}
+                  className="p-3 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-bold text-left hover:bg-emerald-100 transition-colors"
+                >
+                  <PlusCircle className="w-4 h-4 inline mr-1" />
+                  Add Card
+                </button>
+                <button
+                  onClick={() => { onOpenShare(); }}
+                  className="p-3 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-bold text-left hover:bg-emerald-100 transition-colors"
+                >
+                  <Share2 className="w-4 h-4 inline mr-1" />
+                  Share & Earn
+                </button>
+                <button
+                  onClick={onLogout}
+                  className="p-3 rounded-xl bg-slate-100 text-slate-700 text-sm font-bold text-left hover:bg-slate-200 transition-colors"
+                >
+                  <LogOut className="w-4 h-4 inline mr-1" />
+                  Logout
+                </button>
+              </div>
             </div>
           </motion.div>
         </div>

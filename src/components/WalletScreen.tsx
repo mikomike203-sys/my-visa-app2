@@ -5,45 +5,31 @@ import { TransactionIcon } from "./TransactionIcon";
 import type { IconName } from "./icons/FintechIcons";
 import { AnimatedAmount } from "./AnimatedAmount";
 import { Currency, formatMoney } from "../utils/currency";
-
-interface TxItem {
-  id: number;
-  name: string;
-  category: string;
-  amount: number;
-  date: string;
-  icon: IconName;
-}
-
-const todayTx: TxItem[] = [
-  { id: 1, name: "Amazon.com", category: "Shopping", amount: -89.71, date: "Today", icon: "shopping" },
-  { id: 2, name: "Temu.com", category: "Shopping", amount: -30.45, date: "Today", icon: "shopping" },
-];
-const yesterdayTx: TxItem[] = [
-  { id: 3, name: "Apple Music", category: "Subscription", amount: -14.99, date: "Yesterday", icon: "subscription" },
-  { id: 4, name: "Starbucks", category: "Food & Drink", amount: -6.40, date: "Yesterday", icon: "restaurant" },
-  { id: 5, name: "Electric Bill", category: "Utilities", amount: -124.50, date: "Yesterday", icon: "utilities" },
-  { id: 6, name: "Freelance Payment", category: "Income", amount: 850.0, date: "Yesterday", icon: "income" },
-];
+import type { Card, Transaction } from "../types/database";
 
 interface Props {
   currency: Currency;
   hideBalance: boolean;
+  balance: number;
+  fullName: string;
+  transactions: Transaction[];
+  userCards: Card[];
   onSend: () => void;
   onReceive: () => void;
   onNotifications: () => void;
+  onToggleFreeze: (cardId: string, frozen: boolean) => void;
+  onAddCard: () => void;
 }
 
-export function WalletScreen({ currency, hideBalance, onSend, onReceive, onNotifications }: Props) {
-  const totalBalance = 248967.83;
-  const paymentNext = 43093.0;
-  const paymentCompleted = 274825.01;
-  const todayUsed = 614.93;
-  const [todayLimit, setTodayLimit] = useState(43093);
-  const [draftLimit, setDraftLimit] = useState(43093);
+export function WalletScreen({ currency, hideBalance, balance, fullName, transactions, userCards, onSend, onReceive, onNotifications, onAddCard }: Props) {
+  const paymentNext = balance * 0.17;
+  const paymentCompleted = balance - paymentNext;
+  const todayUsed = transactions.slice(0, 5).reduce((sum, t) => sum + t.amount, 0);
+  const [todayLimit, setTodayLimit] = useState(10000);
+  const [draftLimit, setDraftLimit] = useState(10000);
   const [showLimits, setShowLimits] = useState(false);
   const limitPercent = (todayUsed / todayLimit) * 100;
-  const limitPresets = [5000, 10000, 25000, 50000];
+  const limitPresets = [0, 10000, 100000, 1000000, 10000000];
 
   const openLimitEditor = () => {
     setDraftLimit(todayLimit);
@@ -54,6 +40,13 @@ export function WalletScreen({ currency, hideBalance, onSend, onReceive, onNotif
     setTodayLimit(draftLimit);
     setShowLimits(false);
   };
+
+  const groupedTx: Record<string, Transaction[]> = {};
+  transactions.forEach(t => {
+    const date = new Date(t.created_at).toLocaleDateString();
+    if (!groupedTx[date]) groupedTx[date] = [];
+    groupedTx[date].push(t);
+  });
 
   return (
     <div className="flex-1 overflow-y-auto pb-44 bg-white">
@@ -71,7 +64,6 @@ export function WalletScreen({ currency, hideBalance, onSend, onReceive, onNotif
             <button onClick={onNotifications} className="w-10 h-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center cursor-pointer">
               <Bell className="w-[18px] h-[18px] text-black" strokeWidth={2.5} />
             </button>
-            <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-black rounded-full border-2 border-white" />
           </div>
         </div>
       </div>
@@ -79,9 +71,9 @@ export function WalletScreen({ currency, hideBalance, onSend, onReceive, onNotif
       {/* Balance */}
       <div className="px-4 min-[390px]:px-6 mb-6">
         <h2 className="text-4xl font-extrabold tracking-tight text-black mb-1">
-          {hideBalance ? "******" : <AnimatedAmount value={totalBalance} currency={currency} />}
+          {hideBalance ? "******" : <AnimatedAmount value={balance} currency={currency} />}
         </h2>
-        <p className="text-xs text-emerald-600 font-bold">+12.4% from last month</p>
+          <p className="text-xs text-emerald-600 font-bold">Auto converted from USD wallet balance</p>
 
         {/* Quick action buttons */}
         <div className="mt-5 flex gap-2.5">
@@ -101,6 +93,7 @@ export function WalletScreen({ currency, hideBalance, onSend, onReceive, onNotif
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.97 }}
+            onClick={onAddCard}
             className="w-12 py-3.5 rounded-2xl bg-blue-50 flex items-center justify-center"
           >
             <Plus className="w-4 h-4 text-black" strokeWidth={3} />
@@ -108,7 +101,7 @@ export function WalletScreen({ currency, hideBalance, onSend, onReceive, onNotif
         </div>
       </div>
 
-      {/* Two Status Cards (B&W) */}
+      {/* Two Status Cards */}
       <div className="px-4 min-[390px]:px-6 mb-5 flex gap-3">
         <motion.div
           whileTap={{ scale: 0.97 }}
@@ -159,59 +152,47 @@ export function WalletScreen({ currency, hideBalance, onSend, onReceive, onNotif
           <button className="text-[11px] font-bold text-black">View all</button>
         </div>
 
-        {/* Today */}
-        <div className="mb-5">
-          <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2.5">Today</p>
-          <div className="space-y-2">
-            {todayTx.map((tx) => {
-              const isPositive = tx.amount > 0;
-              return (
-                <motion.div
-                  key={tx.id}
-                  whileTap={{ scale: 0.98, y: 1 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                  className="flex items-center gap-3 p-3.5 rounded-2xl bg-white border border-slate-200 cursor-pointer"
-                >
-                  <TransactionIcon icon={tx.icon} size={20} color="#000000" bg="bg-slate-100" strokeWidth={2.4} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-extrabold text-black">{tx.name}</p>
-                    <p className="text-[10px] text-slate-500">{tx.category}</p>
-                  </div>
-                  <p className={`text-sm font-extrabold ${isPositive ? "text-emerald-600" : "text-red-500"}`}>
-                    {isPositive ? "+" : "-"}{formatMoney(Math.abs(tx.amount), currency)}
-                  </p>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
+        {Object.keys(groupedTx).length === 0 && (
+          <p className="text-sm text-slate-400 text-center py-8">No transactions yet</p>
+        )}
 
-        {/* Yesterday */}
-        <div className="mb-5">
-          <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2.5">Yesterday</p>
-          <div className="space-y-2">
-            {yesterdayTx.map((tx) => {
-              const isPositive = tx.amount > 0;
-              return (
-                <motion.div
-                  key={tx.id}
-                  whileTap={{ scale: 0.98, y: 1 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                  className="flex items-center gap-3 p-3.5 rounded-2xl bg-white border border-slate-200 cursor-pointer"
-                >
-                  <TransactionIcon icon={tx.icon} size={20} color="#000000" bg="bg-slate-100" strokeWidth={2.4} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-extrabold text-black">{tx.name}</p>
-                    <p className="text-[10px] text-slate-500">{tx.category}</p>
-                  </div>
-                  <p className={`text-sm font-extrabold ${isPositive ? "text-emerald-600" : "text-red-500"}`}>
-                    {isPositive ? "+" : "-"}{formatMoney(Math.abs(tx.amount), currency)}
-                  </p>
-                </motion.div>
-              );
-            })}
+        {Object.entries(groupedTx).map(([date, txns]) => (
+          <div key={date} className="mb-5">
+            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2.5">{date}</p>
+            <div className="space-y-2">
+              {txns.map((tx) => {
+                const isPositive = tx.type === "receive" || tx.type === "topup";
+                return (
+                  <motion.div
+                    key={tx.id}
+                    whileTap={{ scale: 0.98, y: 1 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                    className="flex items-center gap-3 p-3.5 rounded-2xl bg-white border border-slate-200 cursor-pointer"
+                  >
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-black bg-[#d7ff5f]">
+                      {tx.recipient_avatar_url ? (
+                        <img src={tx.recipient_avatar_url} alt={tx.recipient_name || tx.type} className="h-full w-full object-cover" />
+                      ) : tx.recipient_name ? (
+                        <span className="text-sm font-black text-black">{tx.recipient_name.charAt(0).toUpperCase()}</span>
+                      ) : (
+                        <TransactionIcon icon={(tx.type === "send" ? "send" : tx.type === "receive" ? "income" : "card") as IconName} size={20} color="#000000" bg="bg-transparent" strokeWidth={2.4} />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-extrabold text-black">
+                        {tx.type === "receive" ? `Confirmed you received from ${tx.recipient_name || "sender"}` : tx.type === "send" ? `Sent to ${tx.recipient_name || "recipient"}` : tx.description || tx.type}
+                      </p>
+                      <p className="text-[10px] text-slate-500">{new Date(tx.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+                    </div>
+                    <p className={`font-mono text-sm font-black tabular-nums ${isPositive ? "text-emerald-600" : "text-red-500"}`}>
+                      {isPositive ? "+" : "-"}{formatMoney(tx.amount, currency)}
+                    </p>
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        ))}
       </div>
 
       <AnimatePresence>
@@ -223,7 +204,7 @@ export function WalletScreen({ currency, hideBalance, onSend, onReceive, onNotif
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="relative w-full max-w-[430px] rounded-t-3xl bg-white p-4 min-[390px]:p-6"
+              className="relative w-full max-w-[430px] max-h-[92dvh] overflow-y-auto rounded-t-3xl bg-white p-4 min-[390px]:p-6 pb-[max(24px,env(safe-area-inset-bottom))]"
               style={{ boxShadow: "0 -12px 44px rgba(15,23,42,0.18)" }}
             >
               <div className="flex items-center justify-between mb-5">
@@ -241,16 +222,16 @@ export function WalletScreen({ currency, hideBalance, onSend, onReceive, onNotif
                 <p className="text-3xl font-extrabold text-black mb-4">{formatMoney(draftLimit, currency, { minimumFractionDigits: 0 })}</p>
                 <input
                   type="range"
-                  min={1000}
-                  max={100000}
-                  step={1000}
+                  min={0}
+                  max={10000000}
+                  step={10000}
                   value={draftLimit}
                   onChange={(e) => setDraftLimit(Number(e.target.value))}
                   className="w-full h-2 rounded-full accent-blue-600"
                 />
                 <div className="flex justify-between mt-2 text-[10px] text-slate-500 font-bold">
-                  <span>{formatMoney(1000, currency, { minimumFractionDigits: 0 })}</span>
-                  <span>{formatMoney(100000, currency, { minimumFractionDigits: 0 })}</span>
+                  <span>{formatMoney(0, currency, { minimumFractionDigits: 0 })}</span>
+                  <span>{formatMoney(10000000, currency, { minimumFractionDigits: 0 })}</span>
                 </div>
               </div>
 
@@ -278,4 +259,3 @@ export function WalletScreen({ currency, hideBalance, onSend, onReceive, onNotif
     </div>
   );
 }
-

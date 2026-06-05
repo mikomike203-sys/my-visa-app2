@@ -1,233 +1,437 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { QRCodeSVG } from "qrcode.react";
-import { X, Send, Search, ArrowUpRight, Check, Scan, ImageIcon } from "lucide-react";
-import type { Currency } from "../utils/currency";
-import { formatMoney } from "../utils/currency";
-
-const contacts = [
-  { id: 1, name: "Alex Kim", initials: "AK", account: "Visa **** 4703" },
-  { id: 2, name: "Maria Rodriguez", initials: "MR", account: "Visa **** 8291" },
-  { id: 3, name: "James Wilson", initials: "JW", account: "Visa **** 3156" },
-  { id: 4, name: "Lily Chen", initials: "LC", account: "Visa **** 6042" },
-  { id: 5, name: "David Park", initials: "DP", account: "Visa **** 9918" },
-];
-
-const quickAmounts = [10, 25, 50, 100, 250, 500];
-const MY_QR_DATA = "visa:pay:0xA4F2cE91-Sarah-Mitchell-VISA-4703";
+import { X, AlertCircle, CheckCircle, ScanLine, Keyboard, Upload, Camera, ShieldCheck, UserRound, ChevronRight } from "lucide-react";
+import jsQR from "jsqr";
+import { Currency, formatMoney, toBaseCurrency } from "../utils/currency";
+import type { Card, PublicPerson } from "../types/database";
 
 interface Props {
   open: boolean;
   currency: Currency;
+  balance: number;
+  userCards: Card[];
+  people: PublicPerson[];
+  kycStatus: "pending" | "verified" | "rejected" | "not_submitted";
+  initialRecipient?: string;
+  initialAmount?: string;
+  onSend: (toEmail: string, amount: number, description?: string, cardId?: string) => Promise<void>;
   onClose: () => void;
 }
 
-export function SendSheet({ open, currency, onClose }: Props) {
-  const [step, setStep] = useState(0);
-  const [selectedContact, setSelectedContact] = useState<number | null>(null);
+export function SendSheet({ open, currency, balance, userCards, people, kycStatus, initialRecipient = "", initialAmount = "", onSend, onClose }: Props) {
+  const [email, setEmail] = useState("");
   const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
-  const [search, setSearch] = useState("");
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [description, setDescription] = useState("");
+  const [selectedCardId, setSelectedCardId] = useState<string | undefined>(userCards[0]?.id);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [scanMessage, setScanMessage] = useState("");
+  const [mode, setMode] = useState<"type" | "upload" | "camera">("type");
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const scanActiveRef = useRef(false);
 
-  const filteredContacts = contacts.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
-  const selectedContactData = selectedContact !== null ? contacts.find((c) => c.id === selectedContact) : null;
-  const canSend = amount !== "" && parseFloat(amount) > 0;
+  useEffect(() => {
+    if (open && initialRecipient) setEmail(initialRecipient);
+    if (open && initialAmount) setAmount(initialAmount);
+  }, [initialAmount, initialRecipient, open]);
 
-  const handleSelectContact = useCallback((id: number) => setSelectedContact(id), []);
-  const handleSetAmount = useCallback((val: string) => setAmount(val), []);
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value), []);
-  const handleNoteChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => setNote(e.target.value), []);
-  const handleAmountInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setAmount(e.target.value), []);
-  const handleContinue = useCallback(() => { if (selectedContact !== null) setStep(1); }, [selectedContact]);
-  const handleBack = useCallback(() => setStep((s) => Math.max(0, s - 1)), []);
+  useEffect(() => {
+    if (!selectedCardId && userCards[0]?.id) setSelectedCardId(userCards[0].id);
+  }, [selectedCardId, userCards]);
 
-  const stopScan = useCallback(() => {
-    if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
-    if (videoRef.current) videoRef.current.srcObject = null;
-  }, []);
-
-  const handleClose = useCallback(() => {
-    stopScan();
-    setStep(0); setSelectedContact(null); setAmount(""); setNote(""); setSearch("");
-    onClose();
-  }, [onClose, stopScan]);
-
-  useEffect(() => () => { if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop()); }, []);
-
-  const handleSend = useCallback(() => {
-    if (selectedContact !== null && parseFloat(amount) > 0) {
-      setStep(3);
-      setTimeout(handleClose, 2200);
-    }
-  }, [selectedContact, amount, handleClose]);
-
-  const startScan = useCallback(async () => {
-    setStep(2);
+  const parseQrRecipient = (raw: string) => {
     try {
-      if (navigator.mediaDevices?.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        streamRef.current = stream;
-        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play().catch(() => {}); }
+      const parsed = JSON.parse(raw);
+      return parsed.email || parsed.walletAddress || parsed.recipient || parsed.id || raw;
+    } catch {
+      try {
+        const url = new URL(raw);
+        return url.searchParams.get("send") || raw;
+      } catch {
+        return raw;
       }
-    } catch (e) { /* camera denied */ }
-    setTimeout(() => { setSelectedContact(2); setStep(1); }, 2200);
-  }, []);
+    }
+  };
+
+  const handleQrUpload = async (file?: File) => {
+    setScanMessage("");
+    setError("");
+    if (!file) return;
+    try {
+      const bitmap = await createImageBitmap(file);
+      let raw = "";
+      const Detector = (window as any).BarcodeDetector;
+      if (Detector) {
+        const detector = new Detector({ formats: ["qr_code"] });
+        const codes = await detector.detect(bitmap);
+        raw = codes?.[0]?.rawValue || "";
+      }
+      if (!raw) {
+        const canvas = document.createElement("canvas");
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(bitmap, 0, 0);
+        const image = ctx?.getImageData(0, 0, canvas.width, canvas.height);
+        const decoded = image ? jsQR(image.data, image.width, image.height) : null;
+        raw = decoded?.data || "";
+      }
+      if (!raw) {
+        setScanMessage("No QR code found in that image.");
+        return;
+      }
+      const recipient = parseQrRecipient(raw);
+      if (recipient) {
+        setEmail(recipient);
+        setDescription((prev) => prev || `Payment to ${recipient}`);
+        setScanMessage("Recipient loaded from QR.");
+      } else {
+        setScanMessage("QR found, but it did not include a recipient email.");
+      }
+    } catch (err) {
+      setScanMessage("Could not read that QR code. Try a clearer image.");
+    }
+  };
+
+  const stopCamera = () => {
+    scanActiveRef.current = false;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setCameraOpen(false);
+  };
+
+  const startCameraScan = async () => {
+    setScanMessage("");
+    setError("");
+    const Detector = (window as any).BarcodeDetector;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setScanMessage("Camera access is not supported here. Use Upload QR and choose camera/photo.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setCameraOpen(true);
+      scanActiveRef.current = true;
+      setTimeout(async () => {
+        if (!videoRef.current) return;
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        const detector = Detector ? new Detector({ formats: ["qr_code"] }) : null;
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        const scan = async () => {
+          if (!scanActiveRef.current || !videoRef.current || !streamRef.current) return;
+          try {
+            let raw = "";
+            if (detector) {
+              const codes = await detector.detect(videoRef.current);
+              raw = codes?.[0]?.rawValue || "";
+            } else if (ctx && videoRef.current.videoWidth && videoRef.current.videoHeight) {
+              canvas.width = videoRef.current.videoWidth;
+              canvas.height = videoRef.current.videoHeight;
+              ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+              const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              raw = jsQR(image.data, image.width, image.height)?.data || "";
+            }
+            if (raw) {
+              scanActiveRef.current = false;
+              const recipient = parseQrRecipient(raw);
+              setEmail(recipient);
+              setDescription((prev) => prev || `Payment to ${recipient}`);
+              setScanMessage("Recipient loaded from camera.");
+              stopCamera();
+              return;
+            }
+          } catch {
+            // Keep scanning; single-frame failures are normal.
+          }
+          requestAnimationFrame(scan);
+        };
+        scan();
+      }, 50);
+    } catch {
+      setScanMessage("Camera permission was blocked or unavailable.");
+    }
+  };
+
+  useEffect(() => () => stopCamera(), []);
+
+  const handleSend = async () => {
+    setError("");
+    if (!email) { setError("Enter recipient email, username, or wallet address"); return; }
+    const displayAmount = parseFloat(amount);
+    const numAmount = toBaseCurrency(displayAmount, currency);
+    if (isNaN(displayAmount) || displayAmount <= 0) { setError("Enter a valid amount"); return; }
+    if (numAmount > balance) { setError("Insufficient balance"); return; }
+    if (kycStatus !== "verified") { setError("Finish KYC verification before completing a send."); return; }
+
+    setLoading(true);
+    try {
+      await onSend(email, numAmount, description || undefined, selectedCardId);
+      setSuccess(true);
+      setTimeout(() => {
+        setSuccess(false);
+        setEmail("");
+        setAmount("");
+        setDescription("");
+        onClose();
+      }, 2000);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const displayAmount = parseFloat(amount || "0");
+  const baseAmount = toBaseCurrency(displayAmount, currency);
+  const fee = baseAmount * 0.01;
+  const canSwipe = Boolean(email) && displayAmount > 0 && baseAmount <= balance && kycStatus === "verified";
+  const shownPeople = people.filter((person) => person.email !== email).slice(0, 50);
+  const selectedPerson = people.find((person) => person.email === email || person.id === email || person.fullName === email);
 
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/50" onClick={handleClose} />
-          <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="relative w-full max-w-md bg-white rounded-t-3xl max-h-[94vh] overflow-hidden flex flex-col" style={{ boxShadow: "0 -8px 40px rgba(0,0,0,0.2)" }}>
-            <div className="flex justify-center pt-3 pb-2"><div className="w-10 h-1 rounded-full bg-slate-200" /></div>
-            <div className="flex items-center justify-between px-6 pb-4">
+        <div className="fixed inset-0 z-[120] flex items-end justify-center">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/35"
+            onClick={onClose}
+          />
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            className="relative w-full max-w-[430px] max-h-[92dvh] overflow-y-auto rounded-t-3xl bg-white p-4 min-[390px]:p-6 pb-[max(24px,env(safe-area-inset-bottom))]"
+          >
+            <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-lg font-extrabold text-black">
-                  {step === 0 && "Send Money"}{step === 1 && "Enter Amount"}{step === 2 && "Scan QR"}{step === 3 && "Sent!"}
-                </h2>
-                <p className="text-xs text-slate-500 font-medium">
-                  {step === 0 && "Pick a contact or scan a QR"}{step === 1 && "Set the amount"}{step === 2 && "Point camera at QR"}{step === 3 && "Complete"}
-                </p>
+                <h3 className="text-lg font-extrabold text-black">Send Money</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Balance: {formatMoney(balance, currency)}</p>
               </div>
-              <motion.button whileTap={{ scale: 0.85 }} onClick={handleClose} className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center cursor-pointer">
-                <X className="w-4 h-4 text-black" strokeWidth={2.8} />
-              </motion.button>
+              <button onClick={onClose} className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
+                <X className="w-4 h-4 text-black" />
+              </button>
             </div>
-            <div className="px-6 mb-4 flex gap-2">
-              {[0, 1, 2, 3].map((s) => (
-                <div key={s} className={`h-1 rounded-full flex-1 transition-all duration-300 ${step >= s ? "bg-blue-600" : "bg-slate-200"}`} />
-              ))}
-            </div>
-            <div className="flex-1 overflow-y-auto px-6 pb-10">
-              <AnimatePresence mode="wait">
-                {step === 0 && (
-                  <motion.div key="s0" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                    <motion.button whileTap={{ scale: 0.98 }} onClick={startScan} className="w-full p-5 rounded-3xl bg-blue-600 text-white flex items-center gap-4 cursor-pointer mb-4 shadow-xl shadow-blue-600/20">
-                      <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center">
-                        <Scan className="w-6 h-6 text-white" strokeWidth={2.5} />
-                      </div>
-                      <div className="text-left flex-1">
-                        <p className="text-sm font-extrabold">Scan QR to Pay</p>
-                        <p className="text-[11px] text-white/60 font-medium">Point camera at any Visa QR</p>
-                      </div>
-                      <ArrowUpRight className="w-4 h-4 text-white/60" strokeWidth={2.5} />
-                    </motion.button>
-                    <motion.button whileTap={{ scale: 0.98 }} onClick={() => setStep(2)} className="w-full p-5 rounded-3xl bg-white border border-blue-100 flex items-center gap-4 cursor-pointer mb-6 shadow-sm">
-                      <div className="w-12 h-12 rounded-2xl bg-black flex items-center justify-center">
-                        <QRCodeSVG value={MY_QR_DATA} size={32} level="M" bgColor="#0a0a0a" fgColor="#ffffff" />
-                      </div>
-                      <div className="text-left flex-1">
-                        <p className="text-sm font-extrabold text-black">My QR Code</p>
-                        <p className="text-[11px] text-slate-500 font-medium">Show this to receive money</p>
-                      </div>
-                      <ArrowUpRight className="w-4 h-4 text-slate-400" strokeWidth={2.5} />
-                    </motion.button>
-                    <div className="relative mb-4">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" strokeWidth={2.5} />
-                      <input type="text" placeholder="Search contacts..." value={search} onChange={handleSearchChange} className="w-full pl-10 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black" />
+
+            {success ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="w-8 h-8 text-emerald-600" />
+                </div>
+                <p className="text-lg font-extrabold text-black">Sent Successfully!</p>
+                <p className="text-sm text-slate-500 mt-1">{formatMoney(toBaseCurrency(parseFloat(amount || "0"), currency), currency)} to {email}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {error && (
+                  <div className="flex items-center gap-2 text-red-500 text-sm p-3 rounded-xl bg-red-50">
+                    <AlertCircle className="w-4 h-4" /> {error}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "type", label: "Type", icon: Keyboard },
+                    { id: "upload", label: "Upload QR", icon: Upload },
+                    { id: "camera", label: "Camera", icon: Camera },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setMode(item.id as typeof mode)}
+                        className={`rounded-xl border px-3 py-2 text-xs font-black flex items-center justify-center gap-1 ${mode === item.id ? "border-black bg-[#d7ff5f] text-black shadow-[2px_2px_0_#000]" : "border-slate-200 bg-white text-slate-600"}`}
+                      >
+                        <Icon className="h-3.5 w-3.5" /> {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 mb-1 block">Recipient</label>
+                  <input
+                    type="text"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="email, username, or wallet address"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-black placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {shownPeople.length > 0 && (
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-xs font-black text-slate-600">People</p>
+                      <p className="text-[10px] font-bold text-slate-400">Swipe sideways</p>
                     </div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-extrabold mb-3">Recent Contacts</p>
-                    <div className="space-y-2">
-                      {filteredContacts.map((contact) => (
-                        <motion.button key={contact.id} whileTap={{ scale: 0.97 }} onClick={() => handleSelectContact(contact.id)} className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border cursor-pointer transition-all ${selectedContact === contact.id ? "border-blue-600 bg-blue-50" : "border-slate-200 bg-white"}`}>
-                          <div className="w-10 h-10 rounded-xl bg-black flex items-center justify-center text-white text-xs font-extrabold shrink-0">{contact.initials}</div>
-                          <div className="text-left flex-1">
-                            <p className="text-sm font-extrabold text-black">{contact.name}</p>
-                            <p className="text-[10px] text-slate-500 font-mono">{contact.account}</p>
+                    <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 scrollbar-hide">
+                      {shownPeople.map((person) => (
+                        <button
+                          key={person.id}
+                          onClick={() => {
+                            setEmail(person.email);
+                            setDescription((prev) => prev || `Payment to ${person.fullName}`);
+                          }}
+                          className="w-[74px] shrink-0 text-center"
+                        >
+                          <div className="mx-auto mb-1 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-black bg-[#d7ff5f]">
+                            {person.avatarUrl ? (
+                              <img src={person.avatarUrl} alt={person.fullName} className="h-full w-full object-cover" />
+                            ) : (
+                              <span className="text-sm font-black text-black">{person.fullName.charAt(0).toUpperCase()}</span>
+                            )}
                           </div>
-                          {selectedContact === contact.id && (
-                            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center">
-                              <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                            </motion.div>
-                          )}
-                        </motion.button>
+                          <p className="truncate text-[10px] font-black text-black">{person.fullName}</p>
+                        </button>
                       ))}
                     </div>
-                    <motion.button whileTap={{ scale: 0.97 }} disabled={selectedContact === null} onClick={handleContinue} className={`w-full mt-6 py-3.5 rounded-2xl font-extrabold text-sm flex items-center justify-center gap-2 ${selectedContact !== null ? "bg-blue-600 text-white cursor-pointer shadow-lg shadow-blue-600/20" : "bg-slate-100 text-slate-400 cursor-not-allowed"}`}>
-                      Continue <ArrowUpRight className="w-4 h-4" strokeWidth={2.8} />
-                    </motion.button>
-                  </motion.div>
+                  </div>
                 )}
-                {step === 1 && (
-                  <motion.div key="s1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                    {selectedContactData && (
-                      <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-200 mb-5">
-                        <div className="w-10 h-10 rounded-xl bg-black flex items-center justify-center text-white text-xs font-extrabold">{selectedContactData.initials}</div>
-                        <div>
-                          <p className="text-sm font-extrabold text-black">{selectedContactData.name}</p>
-                          <p className="text-[10px] text-slate-500 font-mono">{selectedContactData.account}</p>
-                        </div>
-                      </div>
+
+                {mode === "upload" && (
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-black bg-[#d7ff5f] px-4 py-3 text-xs font-black text-black shadow-[3px_3px_0_#000]">
+                    <ScanLine className="w-4 h-4" />
+                    Upload recipient QR
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleQrUpload(e.target.files?.[0])}
+                    />
+                  </label>
+                )}
+                {mode === "camera" && (
+                  <div className="rounded-2xl border border-black bg-black p-3">
+                    {cameraOpen ? (
+                      <>
+                        <video ref={videoRef} muted playsInline className="w-full rounded-xl object-cover" style={{ height: "min(73vw, 310px)" }} />
+                        <button onClick={stopCamera} className="mt-3 w-full rounded-xl bg-white py-2 text-xs font-black text-black">Stop camera</button>
+                      </>
+                    ) : (
+                      <button onClick={startCameraScan} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#d7ff5f] px-4 py-3 text-xs font-black text-black">
+                        <Camera className="h-4 w-4" /> Open device camera
+                      </button>
                     )}
-                    <div className="text-center mb-6">
-                      <p className="text-xs text-slate-500 font-medium mb-2">Enter amount</p>
-                      <div className="flex items-center justify-center gap-1">
-                        <span className="text-4xl font-extrabold text-black">$</span>
-                        <input type="number" value={amount} onChange={handleAmountInputChange} placeholder="0" className="text-5xl font-extrabold text-black bg-transparent border-none outline-none w-40 text-center placeholder:text-slate-200" />
+                  </div>
+                )}
+                {scanMessage && <p className="text-xs font-bold text-slate-600">{scanMessage}</p>}
+                {kycStatus !== "verified" && (
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-800">
+                    <ShieldCheck className="h-4 w-4 shrink-0" />
+                    You can prepare this transfer, but final sending unlocks after KYC is verified.
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 mb-1 block">Amount</label>
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-black placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-2xl font-extrabold"
+                  />
+                </div>
+
+                {email && (
+                  <div className="rounded-2xl border border-black bg-[#f7f7f4] p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-black bg-[#d7ff5f]">
+                        {selectedPerson?.avatarUrl ? (
+                          <img src={selectedPerson.avatarUrl} alt={selectedPerson.fullName} className="h-full w-full object-cover" />
+                        ) : (
+                          <UserRound className="h-6 w-6 text-black" />
+                        )}
                       </div>
-                      <p className="text-[10px] text-slate-500 mt-1 font-medium">Available: {formatMoney(43093, currency)}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black text-black">{selectedPerson?.fullName || email}</p>
+                        <p className="truncate text-xs font-bold text-zinc-500">{selectedPerson?.email || "Confirm recipient before sending"}</p>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 mb-5">
-                      {quickAmounts.map((qa) => (
-                        <motion.button key={qa} whileTap={{ scale: 0.92 }} onClick={() => handleSetAmount(qa.toString())} className={`py-2.5 rounded-xl text-sm font-extrabold border cursor-pointer transition-all ${amount === qa.toString() ? "bg-blue-600 text-white border-blue-600" : "bg-white text-slate-600 border-slate-200"}`}>{formatMoney(qa, currency, { minimumFractionDigits: 0 })}</motion.button>
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 mb-1 block">Description (optional)</label>
+                  <input
+                    type="text"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="What's this for?"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-black placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {userCards.length > 0 && (
+                  <div>
+                    <label className="text-xs font-bold text-slate-600 mb-1 block">From Card</label>
+                    <select
+                      value={selectedCardId}
+                      onChange={(e) => setSelectedCardId(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {userCards.map((c) => (
+                        <option key={c.id} value={c.id}>{c.label} - {formatMoney(c.balance, currency)}</option>
                       ))}
-                    </div>
-                    <textarea value={note} onChange={handleNoteChange} placeholder="Add a note (optional)" className="w-full p-3 rounded-2xl bg-slate-50 border border-slate-200 text-sm text-black placeholder:text-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black mb-5" rows={2} />
-                    <div className="flex gap-3">
-                      <motion.button whileTap={{ scale: 0.97 }} onClick={handleBack} className="flex-1 py-3.5 rounded-2xl bg-slate-100 text-black font-extrabold text-sm cursor-pointer">Back</motion.button>
-                      <motion.button whileTap={{ scale: 0.97 }} disabled={!canSend} onClick={handleSend} className={`flex-1 py-3.5 rounded-2xl font-extrabold text-sm flex items-center justify-center gap-2 ${canSend ? "bg-blue-600 text-white cursor-pointer shadow-lg shadow-blue-600/20" : "bg-slate-100 text-slate-400 cursor-not-allowed"}`}>
-                        <Send className="w-4 h-4" strokeWidth={2.8} /> Send
-                      </motion.button>
-                    </div>
-                  </motion.div>
+                    </select>
+                  </div>
                 )}
-                {step === 2 && (
-                  <motion.div key="s2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center">
-                    <div className="relative w-full max-w-[300px] aspect-square rounded-3xl bg-black overflow-hidden mb-6" style={{ boxShadow: "0 12px 40px rgba(0,0,0,0.3)" }}>
-                      <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted />
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="w-44 h-44 border-2 border-white rounded-2xl relative">
-                          <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-2xl" />
-                          <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-2xl" />
-                          <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-2xl" />
-                          <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-2xl" />
-                          <motion.div animate={{ y: [0, 170, 0] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }} className="absolute left-2 right-2 top-2 h-0.5 bg-white" style={{ boxShadow: "0 0 10px rgba(255,255,255,0.7)" }} />
-                        </div>
-                      </div>
-                      <div className="absolute bottom-3 left-3 right-3 p-2 rounded-lg bg-black/70 backdrop-blur-sm">
-                        <p className="text-[10px] text-white/80 text-center font-bold">Scanning for QR code...</p>
-                      </div>
-                    </div>
-                    <p className="text-xs font-extrabold text-black mb-1">Align QR within the frame</p>
-                    <p className="text-[11px] text-slate-500 text-center mb-5 max-w-xs">The scan happens automatically. Hold steady for best results.</p>
-                    <div className="flex gap-2 w-full">
-                      <motion.button whileTap={{ scale: 0.97 }} onClick={() => { stopScan(); setStep(0); }} className="flex-1 py-3 rounded-2xl bg-slate-100 text-black font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer">
-                        <X className="w-4 h-4" strokeWidth={2.8} /> Cancel
-                      </motion.button>
-                      <motion.button whileTap={{ scale: 0.97 }} className="flex-1 py-3 rounded-2xl bg-blue-600 text-white font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer">
-                        <ImageIcon className="w-4 h-4" strokeWidth={2.8} /> Gallery
-                      </motion.button>
-                    </div>
-                  </motion.div>
-                )}
-                {step === 3 && (
-                  <motion.div key="s3" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center py-12">
-                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.1 }} className="w-20 h-20 rounded-3xl bg-blue-600 flex items-center justify-center mb-5">
-                      <Check className="w-10 h-10 text-white" strokeWidth={3} />
-                    </motion.div>
-                    <h3 className="text-xl font-extrabold text-black mb-1">Sent Successfully!</h3>
-                    <p className="text-sm text-slate-500 mb-2">{formatMoney(Number(amount || 0), currency)} sent to {selectedContactData?.name}</p>
-                    {note && <p className="text-xs text-slate-500 italic">"{note}"</p>}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+
+                <div className="bg-blue-50 rounded-xl p-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Amount</span>
+                    <span className="font-bold text-black">{formatMoney(baseAmount, currency)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm mt-2">
+                    <span className="text-slate-600">Fee (1%)</span>
+                    <span className="font-bold text-black">{formatMoney(fee, currency)}</span>
+                  </div>
+                  <div className="border-t border-blue-200 mt-2 pt-2 flex justify-between">
+                    <span className="font-bold text-black">Total</span>
+                    <span className="font-bold text-black">{formatMoney(baseAmount + fee, currency)}</span>
+                  </div>
+                </div>
+
+                <div className={`relative h-14 overflow-hidden rounded-2xl border border-black ${canSwipe ? "bg-[#d7ff5f]" : "bg-slate-100"}`}>
+                  <p className="absolute inset-0 flex items-center justify-center text-sm font-black text-black">
+                    {loading ? "Sending..." : canSwipe ? "Swipe to send" : "Complete recipient, amount, and KYC"}
+                  </p>
+                  <motion.button
+                    type="button"
+                    drag={canSwipe && !loading ? "x" : false}
+                    dragConstraints={{ left: 0, right: 280 }}
+                    dragElastic={0.06}
+                    onDragEnd={(_, info) => {
+                      if (info.offset.x > 170) handleSend();
+                    }}
+                    onClick={() => {
+                      if (!canSwipe) handleSend();
+                    }}
+                    className="absolute left-1 top-1 flex h-12 w-12 items-center justify-center rounded-xl bg-black text-white shadow-lg"
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </motion.button>
+                </div>
+              </div>
+            )}
           </motion.div>
         </div>
       )}
     </AnimatePresence>
   );
 }
-
