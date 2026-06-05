@@ -6,7 +6,7 @@ import type { CardColor, CardPattern } from "./Card3D";
 import { TransactionIcon } from "./TransactionIcon";
 import type { IconName } from "./icons/FintechIcons";
 import { Currency, formatMoney, toBaseCurrency } from "../utils/currency";
-import type { Card, Transaction } from "../types/database";
+import type { Card, PublicPerson, Transaction } from "../types/database";
 import { AnimatedAmount } from "./AnimatedAmount";
 
 const quickActions: { icon: IconName; label: string; action?: string }[] = [
@@ -32,6 +32,7 @@ interface Props {
   avatarUrl: string;
   kycStatus: "pending" | "verified" | "rejected" | "not_submitted";
   transactions: Transaction[];
+  people: PublicPerson[];
   onToggleFreeze: (cardId: string, frozen: boolean) => void;
   onCardChange: (index: number) => void;
   onSend: (recipient?: string) => void;
@@ -44,7 +45,7 @@ interface Props {
 
 export function HomeScreen({
   currency, cardColor, cardPattern, hideBalance, greeting, userCards,
-  activeCardIndex, balance, fullName, email, avatarUrl, kycStatus, transactions,
+  activeCardIndex, balance, fullName, email, avatarUrl, kycStatus, transactions, people,
   onSend, onReceive, onTopUp, onAddCard, onNotifications, onLogout
 }: Props) {
   const [topUpError, setTopUpError] = useState("");
@@ -102,11 +103,28 @@ export function HomeScreen({
     avatarUrl: t.recipient_avatar_url,
     person: labelForPerson(t.recipient_name, t.recipient_email),
   }));
-  const previousRecipients = Array.from(new Map(
+  const recentPeople = Array.from(new Map(
     transactions
       .filter((t) => t.type === "send" && (t.recipient_email || t.recipient_name))
-      .map((t) => [t.recipient_email || t.recipient_name || t.id, t])
-  ).values()).slice(0, 6);
+      .map((t) => {
+        const matched = people.find((person) => person.email === t.recipient_email || person.fullName === t.recipient_name);
+        return [t.recipient_email || t.recipient_name || t.id, {
+          id: t.id,
+          recipient: t.recipient_email || t.recipient_name || "",
+          label: matched?.fullName || labelForPerson(t.recipient_name, t.recipient_email),
+          avatarUrl: matched?.avatarUrl || t.recipient_avatar_url || null,
+        }];
+      })
+  ).values());
+  const suggestedPeople = people
+    .filter((person) => person.email !== email && !recentPeople.some((item) => item.recipient === person.email))
+    .map((person) => ({
+      id: person.id,
+      recipient: person.email,
+      label: person.fullName,
+      avatarUrl: person.avatarUrl,
+    }));
+  const sendAgainPeople = [...recentPeople, ...suggestedPeople];
 
   const downloadReceipt = (tx: Transaction) => {
     const content = [
@@ -174,20 +192,18 @@ export function HomeScreen({
         />
       </div>
 
+      <motion.div
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.55, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
+      >
       {/* Add Card button */}
       <div className="px-4 min-[390px]:px-6 mb-5">
         <motion.button
           whileTap={{ scale: 0.96 }}
           onClick={onAddCard}
-          className="relative mx-auto h-[42px] px-4 rounded-xl bg-[#020304] text-white flex items-center justify-center gap-2.5 cursor-pointer overflow-hidden shadow-[0_10px_24px_rgba(2,3,4,0.22)]"
-          animate={{ boxShadow: ["0 0 0 rgba(2,3,4,0)", "0 0 28px rgba(2,3,4,0.34)", "0 0 0 rgba(2,3,4,0)"] }}
-          transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+          className="relative mx-auto h-[42px] px-4 rounded-xl bg-[#020304] text-white flex items-center justify-center gap-2.5 cursor-pointer overflow-hidden"
         >
-          <motion.div
-            className="absolute inset-y-[-35%] -left-[55%] w-[58%] rotate-12 bg-white/28 blur-[5px]"
-            animate={{ left: ["-55%", "120%"] }}
-            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-          />
           <div className="relative w-7 h-7 rounded-lg bg-white/12 flex items-center justify-center">
             <Plus className="w-4 h-4 text-white" strokeWidth={3.2} />
           </div>
@@ -221,26 +237,24 @@ export function HomeScreen({
         {withdrawMessage && <p className="mt-3 text-xs font-bold text-amber-700">{withdrawMessage}</p>}
       </div>
 
-      {previousRecipients.length > 0 && (
+      {sendAgainPeople.length > 0 && (
         <div className="px-6 mb-6">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-extrabold text-black">Send again</h3>
             <RotateCcw className="h-4 w-4 text-black" />
           </div>
           <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
-            {previousRecipients.map((tx) => {
-              const recipient = tx.recipient_email || tx.recipient_name || "";
-              const label = labelForPerson(tx.recipient_name, tx.recipient_email);
+            {sendAgainPeople.map((person) => {
               return (
-              <button key={tx.id} onClick={() => onSend(recipient)} className="min-w-[72px] text-center">
+              <button key={person.id} onClick={() => onSend(person.recipient)} className="min-w-[72px] text-center">
                 <div className="mx-auto mb-1 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-black bg-[#d7ff5f] text-sm font-black text-black">
-                  {tx.recipient_avatar_url ? (
-                    <img src={tx.recipient_avatar_url} alt={tx.recipient_name || recipient} className="h-full w-full object-cover" />
+                  {person.avatarUrl ? (
+                    <img src={person.avatarUrl} alt={person.label} className="h-full w-full object-cover" />
                   ) : (
-                    label.charAt(0).toUpperCase()
+                    person.label.charAt(0).toUpperCase()
                   )}
                 </div>
-                <p className="truncate text-[10px] font-bold text-black">{label}</p>
+                <p className="truncate text-[10px] font-bold text-black">{person.label}</p>
               </button>
               );
             })}
@@ -253,7 +267,7 @@ export function HomeScreen({
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={onSend}
-          className="flex-1 py-3.5 rounded-2xl bg-blue-600 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20"
+          className="flex-1 py-3.5 rounded-2xl bg-blue-600 text-white text-xs font-extrabold flex items-center justify-center gap-2"
         >
           <Send className="w-4 h-4" strokeWidth={2.8} /> Send
         </motion.button>
@@ -325,7 +339,7 @@ export function HomeScreen({
       <div className="px-6">
         <motion.button
           whileTap={{ scale: 0.98 }}
-          className="w-full p-4 rounded-2xl bg-blue-600 text-white flex items-center justify-between shadow-xl shadow-blue-600/20"
+          className="w-full p-4 rounded-2xl bg-blue-600 text-white flex items-center justify-between"
         >
           <div className="text-left">
             <p className="text-sm font-extrabold">Explore all features</p>
@@ -334,6 +348,7 @@ export function HomeScreen({
           <ChevronRight className="w-5 h-5 text-white" strokeWidth={2.5} />
         </motion.button>
       </div>
+      </motion.div>
       <AnimatePresence>
         {showTopUp && (
           <div className="fixed inset-0 z-[130] flex items-end justify-center">

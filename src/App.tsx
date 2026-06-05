@@ -353,6 +353,7 @@ function App() {
               balance={profile?.balance || 0}
               fullName={profile?.full_name || ""}
               transactions={transactions}
+              people={people}
               avatarUrl={profile?.avatar_url || user.user_metadata?.avatar_url || user.user_metadata?.picture || ""}
               email={user.email || ""}
               kycStatus={profile?.kyc_status || "not_submitted"}

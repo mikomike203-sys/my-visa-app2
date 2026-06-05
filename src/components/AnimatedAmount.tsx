@@ -24,7 +24,7 @@ export function AnimatedAmount({ value, currency, className = "", minimumFractio
     });
 
     const controls = animate(motionValue, value, {
-      duration: 0.9,
+      duration: 1.8,
       ease: [0.16, 1, 0.3, 1],
     });
     previousValue.current = value;
