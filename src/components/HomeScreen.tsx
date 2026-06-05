@@ -41,12 +41,13 @@ interface Props {
   onAddCard: () => void;
   onNotifications: () => void;
   onLogout: () => void;
+  onExploreFeatures: () => void;
 }
 
 export function HomeScreen({
   currency, cardColor, cardPattern, hideBalance, greeting, userCards,
   activeCardIndex, balance, fullName, email, avatarUrl, kycStatus, transactions, people,
-  onSend, onReceive, onTopUp, onAddCard, onNotifications, onLogout
+  onSend, onReceive, onTopUp, onAddCard, onNotifications, onLogout, onExploreFeatures
 }: Props) {
   const [topUpError, setTopUpError] = useState("");
   const [showTopUp, setShowTopUp] = useState(false);
@@ -339,6 +340,7 @@ export function HomeScreen({
       <div className="px-6">
         <motion.button
           whileTap={{ scale: 0.98 }}
+          onClick={onExploreFeatures}
           className="w-full p-4 rounded-2xl bg-blue-600 text-white flex items-center justify-between"
         >
           <div className="text-left">

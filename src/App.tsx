@@ -79,7 +79,8 @@ function App() {
       sessionStorage.removeItem("visa-show-wallet-splash");
       return;
     }
-    const shouldShowSplash = sessionStorage.getItem("visa-show-wallet-splash") === "true";
+    const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    const shouldShowSplash = sessionStorage.getItem("visa-show-wallet-splash") === "true" || navigation?.type === "reload";
     if (!shouldShowSplash) {
       setShowWalletSplash(false);
       return;
@@ -381,6 +382,7 @@ function App() {
               onAddCard={openAddCard}
               onNotifications={openNotifications}
               onLogout={logout}
+              onExploreFeatures={openMore}
             />
           )}
           {activeTab === "wallet" && (

@@ -94,6 +94,21 @@ export function MoreSheet({
             </div>
 
             <div className="space-y-5">
+              <motion.div
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                className="overflow-hidden rounded-[26px] border border-black bg-black shadow-[5px_5px_0_#000]"
+              >
+                <img
+                  src="/vv.jpg"
+                  alt="Introducing the future"
+                  className="h-72 w-full object-cover object-center"
+                  loading="eager"
+                  decoding="async"
+                />
+              </motion.div>
+
               <div className="rounded-[24px] border border-black bg-black p-4 text-white">
                 <div className="flex items-center justify-between">
                   <div>
