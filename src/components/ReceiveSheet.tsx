@@ -81,7 +81,7 @@ export function ReceiveSheet({ open, email, fullName, walletAddress, onSendToMe,
               </div>
               <p className="text-sm font-bold text-black mb-1">{fullName}</p>
               <div className="flex items-center justify-center gap-2 mb-4">
-                <span className="text-xs text-slate-500">{email}</span>
+                <span className="text-xs text-slate-500">Visa profile</span>
               </div>
               <div className="rounded-2xl border border-black bg-[#f7f7f4] p-3 text-left">
                 <p className="text-[10px] font-black uppercase text-slate-500">Payment request link</p>

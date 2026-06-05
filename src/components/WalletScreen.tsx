@@ -108,14 +108,14 @@ export function WalletScreen({ currency, hideBalance, balance, fullName, transac
           className="flex-1 p-4 rounded-2xl bg-blue-600 text-white cursor-pointer shadow-xl shadow-blue-600/20"
         >
           <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1 font-bold">Payment Next</p>
-          <p className="text-lg font-extrabold">{hideBalance ? "******" : formatMoney(paymentNext, currency)}</p>
+          <p className="font-mono text-lg font-black tabular-nums">{hideBalance ? "******" : <AnimatedAmount value={paymentNext} currency={currency} />}</p>
         </motion.div>
         <motion.div
           whileTap={{ scale: 0.97 }}
           className="flex-1 p-4 rounded-2xl bg-white border border-slate-200 cursor-pointer"
         >
           <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1 font-bold">Completed</p>
-          <p className="text-lg font-extrabold text-black">{hideBalance ? "******" : formatMoney(paymentCompleted, currency, { minimumFractionDigits: 0 })}</p>
+          <p className="font-mono text-lg font-black tabular-nums text-black">{hideBalance ? "******" : <AnimatedAmount value={paymentCompleted} currency={currency} minimumFractionDigits={0} />}</p>
         </motion.div>
       </div>
 

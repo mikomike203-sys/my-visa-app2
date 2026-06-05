@@ -84,6 +84,9 @@ export function AdminPage() {
     }
   };
 
+  const verifiedUsers = profiles.filter((p) => p.kyc_status === "verified").length;
+  const pendingKyc = profiles.filter((p) => p.kyc_status === "pending").length;
+  const completedTransactions = transactions.filter((t) => t.status === "completed").length;
   const filteredProfiles = profiles.filter(p =>
     p.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.email.toLowerCase().includes(searchQuery.toLowerCase())
@@ -91,11 +94,11 @@ export function AdminPage() {
 
   if (!authenticated) {
     return (
-      <div className="min-h-dvh bg-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-dvh bg-black flex items-center justify-center p-4">
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-red-500 to-orange-600 rounded-2xl mb-4 shadow-lg shadow-red-500/25">
-              <Shield className="w-8 h-8 text-white" />
+            <div className="inline-flex items-center justify-center w-16 h-16 border border-white/20 bg-white rounded-2xl mb-4">
+              <Shield className="w-8 h-8 text-black" />
             </div>
             <h1 className="text-2xl font-extrabold text-white">Admin Panel</h1>
             <p className="text-slate-400 mt-1 text-sm">Authorized access only</p>
@@ -112,7 +115,7 @@ export function AdminPage() {
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Username"
               required
-              className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full px-4 py-3 bg-black border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-white"
             />
             <input
               type="password"
@@ -120,11 +123,11 @@ export function AdminPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
               required
-              className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full px-4 py-3 bg-black border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-white"
             />
             <button
               type="submit"
-              className="w-full py-3 bg-gradient-to-r from-red-500 to-orange-600 text-white font-bold rounded-xl hover:from-red-600 hover:to-orange-700 transition-all shadow-lg shadow-red-500/20"
+              className="w-full py-3 bg-white text-black font-black rounded-xl hover:bg-zinc-200 transition-all"
             >
               Login
             </button>
@@ -135,7 +138,7 @@ export function AdminPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-slate-900">
+    <div className="min-h-dvh bg-black">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -151,11 +154,11 @@ export function AdminPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-slate-800/50 rounded-2xl p-5 border border-slate-700/50">
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 mb-8">
+          <div className="bg-[#050505] rounded-2xl p-5 border border-white/10">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
-                <Users className="w-5 h-5 text-indigo-400" />
+              <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center">
+                <Users className="w-5 h-5 text-black" />
               </div>
               <div>
                 <p className="text-xs text-slate-400">Total Users</p>
@@ -163,10 +166,10 @@ export function AdminPage() {
               </div>
             </div>
           </div>
-          <div className="bg-slate-800/50 rounded-2xl p-5 border border-slate-700/50">
+          <div className="bg-[#050505] rounded-2xl p-5 border border-white/10">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-emerald-400" />
+              <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-black" />
               </div>
               <div>
                 <p className="text-xs text-slate-400">Total Balance</p>
@@ -176,16 +179,25 @@ export function AdminPage() {
               </div>
             </div>
           </div>
-          <div className="bg-slate-800/50 rounded-2xl p-5 border border-slate-700/50">
+          <div className="bg-[#050505] rounded-2xl p-5 border border-white/10">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                <ArrowUpDown className="w-5 h-5 text-amber-400" />
+              <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center">
+                <ArrowUpDown className="w-5 h-5 text-black" />
               </div>
               <div>
                 <p className="text-xs text-slate-400">Audit Events</p>
                 <p className="text-xl font-bold text-white">{transactions.length}</p>
               </div>
             </div>
+          </div>
+          <div className="bg-[#050505] rounded-2xl p-5 border border-white/10">
+            <p className="text-xs text-slate-400">Verified KYC</p>
+            <p className="mt-2 text-xl font-bold text-white">{verifiedUsers}</p>
+          </div>
+          <div className="bg-[#050505] rounded-2xl p-5 border border-white/10">
+            <p className="text-xs text-slate-400">Pending KYC</p>
+            <p className="mt-2 text-xl font-bold text-white">{pendingKyc}</p>
+            <p className="mt-1 text-[10px] text-slate-500">{completedTransactions} completed txns</p>
           </div>
         </div>
 
@@ -195,7 +207,7 @@ export function AdminPage() {
             onClick={() => setSelectedTab("users")}
             className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
               selectedTab === "users"
-                ? "bg-indigo-500 text-white"
+                ? "bg-white text-black"
                 : "bg-slate-800 text-slate-400 hover:bg-slate-700"
             }`}
           >
@@ -205,7 +217,7 @@ export function AdminPage() {
             onClick={() => setSelectedTab("transactions")}
             className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
               selectedTab === "transactions"
-                ? "bg-indigo-500 text-white"
+                ? "bg-white text-black"
                 : "bg-slate-800 text-slate-400 hover:bg-slate-700"
             }`}
           >
@@ -220,8 +232,8 @@ export function AdminPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search users or emails..."
-            className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="Search users by name..."
+            className="w-full pl-10 pr-4 py-3 bg-black border border-white/15 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-white"
           />
         </div>
 
@@ -229,21 +241,21 @@ export function AdminPage() {
         {selectedTab === "users" && (
           <div className="space-y-3">
             {filteredProfiles.map((p) => (
-              <div key={p.id} className="bg-slate-800/50 rounded-2xl p-5 border border-slate-700/50">
+              <div key={p.id} className="bg-[#050505] rounded-2xl p-5 border border-white/10">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg">
-                      {p.full_name.charAt(0).toUpperCase()}
+                    <div className="w-12 h-12 overflow-hidden rounded-full border border-white/20 bg-white flex items-center justify-center text-black font-bold text-lg">
+                      {p.avatar_url ? <img src={p.avatar_url} alt={p.full_name} className="h-full w-full object-cover" /> : p.full_name.charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <p className="font-bold text-white">{p.full_name}</p>
-                      <p className="text-sm text-slate-400">{p.email}</p>
+                      <p className="text-sm text-slate-400">Visa profile</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-white">${p.balance.toLocaleString()}</p>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      p.kyc_status === "verified" ? "bg-emerald-500/20 text-emerald-400" :
+                      p.kyc_status === "verified" ? "bg-white text-black" :
                       p.kyc_status === "pending" ? "bg-amber-500/20 text-amber-400" :
                       p.kyc_status === "rejected" ? "bg-red-500/20 text-red-400" :
                       "bg-slate-500/20 text-slate-400"
@@ -252,13 +264,13 @@ export function AdminPage() {
                     </span>
                   </div>
                 </div>
-                <div className="flex gap-2 mt-4 pt-4 border-t border-slate-700/50">
+                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-white/10">
                   <button
                     onClick={() => {
                       setSelectedUser(p);
                       setShowAdjustModal(p.id);
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 text-xs font-medium hover:bg-indigo-500/20 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/15 bg-white text-black text-xs font-black hover:bg-zinc-200 transition-colors"
                   >
                     <ClipboardCheck className="w-3 h-3" /> Audit Amount
                   </button>
@@ -267,19 +279,19 @@ export function AdminPage() {
                       await adminRequest("adjust", { userId: p.id, amount: 1000, reason: "Admin quick credit" });
                       await loadData();
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/15 bg-black text-white text-xs font-black hover:bg-zinc-900 transition-colors"
                   >
                     <DollarSign className="w-3 h-3" /> Credit $1,000
                   </button>
                   <button
                     onClick={() => handleKycStatus(p.id, "verified")}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-lime-500/10 text-lime-300 text-xs font-medium hover:bg-lime-500/20 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/15 bg-black text-white text-xs font-black hover:bg-zinc-900 transition-colors"
                   >
                     Verify KYC
                   </button>
                   <button
                     onClick={() => handleKycStatus(p.id, "rejected")}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-300 text-xs font-medium hover:bg-red-500/20 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/40 bg-black text-red-300 text-xs font-black hover:bg-zinc-900 transition-colors"
                   >
                     Reject KYC
                   </button>
@@ -293,7 +305,7 @@ export function AdminPage() {
         {selectedTab === "transactions" && (
           <div className="space-y-3">
             {transactions.map((t) => (
-              <div key={t.id} className="bg-slate-800/50 rounded-2xl p-4 border border-slate-700/50">
+              <div key={t.id} className="bg-[#050505] rounded-2xl p-4 border border-white/10">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-bold text-white capitalize">{t.type}</p>
@@ -301,17 +313,17 @@ export function AdminPage() {
                       {t.description || "No description"} · {new Date(t.created_at).toLocaleString()}
                     </p>
                     {t.recipient_name && (
-                      <p className="text-xs text-slate-500 mt-0.5">To: {t.recipient_name} ({t.recipient_email})</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Person: {t.recipient_name}</p>
                     )}
                   </div>
                   <div className="text-right">
-                    <p className={`font-bold ${
-                      t.type === "receive" || t.type === "topup" ? "text-emerald-400" : "text-red-400"
+                    <p className={`font-mono font-black tabular-nums ${
+                      t.type === "receive" || t.type === "topup" ? "text-white" : "text-red-400"
                     }`}>
                       {t.type === "receive" || t.type === "topup" ? "+" : "-"}${t.amount.toLocaleString()}
                     </p>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      t.status === "completed" ? "bg-emerald-500/20 text-emerald-400" :
+                      t.status === "completed" ? "bg-white text-black" :
                       t.status === "pending" ? "bg-amber-500/20 text-amber-400" :
                       "bg-red-500/20 text-red-400"
                     }`}>

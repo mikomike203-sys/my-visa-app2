@@ -51,7 +51,7 @@ export function SharePage({ onBack }: Props) {
               <QRCodeSVG value={shareLink} size={170} level="M" />
             </div>
             <p className="text-sm font-black text-black">{profile?.full_name || "Visa Kenya user"}</p>
-            <p className="text-xs font-bold text-zinc-500">{profile?.email}</p>
+            <p className="text-xs font-bold text-zinc-500">Visa profile</p>
           </div>
 
           <div className="mb-4 rounded-2xl border border-black bg-white p-3">

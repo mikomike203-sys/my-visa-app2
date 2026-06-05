@@ -7,6 +7,7 @@ import { TransactionIcon } from "./TransactionIcon";
 import type { IconName } from "./icons/FintechIcons";
 import { Currency, formatMoney, toBaseCurrency } from "../utils/currency";
 import type { Card, Transaction } from "../types/database";
+import { AnimatedAmount } from "./AnimatedAmount";
 
 const quickActions: { icon: IconName; label: string; action?: string }[] = [
   { icon: "send", label: "Send", action: "send" },
@@ -14,6 +15,8 @@ const quickActions: { icon: IconName; label: string; action?: string }[] = [
   { icon: "wallet", label: "Top Up" },
   { icon: "bills", label: "Withdraw" },
 ];
+
+const labelForPerson = (name?: string | null, email?: string | null) => name || email?.split("@")[0] || "Visa user";
 
 interface Props {
   currency: Currency;
@@ -97,7 +100,7 @@ export function HomeScreen({
     date: new Date(t.created_at).toLocaleDateString(),
     icon: (t.type === "send" ? "send" : t.type === "receive" ? "income" : t.type === "payment" ? "shopping" : "card") as IconName,
     avatarUrl: t.recipient_avatar_url,
-    person: t.recipient_name || t.recipient_email,
+    person: labelForPerson(t.recipient_name, t.recipient_email),
   }));
   const previousRecipients = Array.from(new Map(
     transactions
@@ -112,7 +115,7 @@ export function HomeScreen({
       `Type: ${tx.type}`,
       `Amount: ${formatMoney(tx.amount, currency)}`,
       `Description: ${tx.description || "N/A"}`,
-      `Recipient: ${tx.recipient_name || tx.recipient_email || "N/A"}`,
+      `Recipient: ${labelForPerson(tx.recipient_name, tx.recipient_email)}`,
       `Date: ${new Date(tx.created_at).toLocaleString()}`,
       `Status: ${tx.status}`,
     ].join("\n");
@@ -154,7 +157,7 @@ export function HomeScreen({
       <div className="px-6 mb-4">
         <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Total Balance</p>
         <p className="font-mono text-4xl font-black text-black tracking-tight mt-1 tabular-nums">
-          {hideBalance ? "******" : formatMoney(balance, currency)}
+          {hideBalance ? "******" : <AnimatedAmount value={balance} currency={currency} />}
         </p>
       </div>
 
@@ -227,16 +230,17 @@ export function HomeScreen({
           <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
             {previousRecipients.map((tx) => {
               const recipient = tx.recipient_email || tx.recipient_name || "";
+              const label = labelForPerson(tx.recipient_name, tx.recipient_email);
               return (
               <button key={tx.id} onClick={() => onSend(recipient)} className="min-w-[72px] text-center">
                 <div className="mx-auto mb-1 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-black bg-[#d7ff5f] text-sm font-black text-black">
                   {tx.recipient_avatar_url ? (
                     <img src={tx.recipient_avatar_url} alt={tx.recipient_name || recipient} className="h-full w-full object-cover" />
                   ) : (
-                    (tx.recipient_name || tx.recipient_email || "?").charAt(0).toUpperCase()
+                    label.charAt(0).toUpperCase()
                   )}
                 </div>
-                <p className="truncate text-[10px] font-bold text-black">{tx.recipient_name || tx.recipient_email}</p>
+                <p className="truncate text-[10px] font-bold text-black">{label}</p>
               </button>
               );
             })}
@@ -295,7 +299,7 @@ export function HomeScreen({
                   {tx.avatarUrl ? (
                     <img src={tx.avatarUrl} alt={tx.person || tx.category} className="h-full w-full object-cover" />
                   ) : tx.person ? (
-                    <span className="text-sm font-black text-black">{tx.person.charAt(0).toUpperCase()}</span>
+                        <span className="text-sm font-black text-black">{tx.person.charAt(0).toUpperCase()}</span>
                   ) : (
                     <TransactionIcon icon={tx.icon} size={20} color="#000000" />
                   )}

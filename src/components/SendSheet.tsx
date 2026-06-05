@@ -18,6 +18,8 @@ interface Props {
   onClose: () => void;
 }
 
+const displayRecipient = (person?: PublicPerson, fallback?: string) => person?.fullName || fallback?.split("@")[0] || "Visa user";
+
 export function SendSheet({ open, currency, balance, userCards, people, kycStatus, initialRecipient = "", initialAmount = "", onSend, onClose }: Props) {
   const [email, setEmail] = useState("");
   const [amount, setAmount] = useState("");
@@ -194,7 +196,7 @@ export function SendSheet({ open, currency, balance, userCards, people, kycStatu
   const baseAmount = toBaseCurrency(displayAmount, currency);
   const fee = baseAmount * 0.01;
   const canSwipe = Boolean(email) && displayAmount > 0 && baseAmount <= balance && kycStatus === "verified";
-  const shownPeople = people.filter((person) => person.email !== email).slice(0, 50);
+  const shownPeople = people.filter((person) => person.email !== email);
   const selectedPerson = people.find((person) => person.email === email || person.id === email || person.fullName === email);
 
   return (
@@ -231,7 +233,7 @@ export function SendSheet({ open, currency, balance, userCards, people, kycStatu
                   <CheckCircle className="w-8 h-8 text-emerald-600" />
                 </div>
                 <p className="text-lg font-extrabold text-black">Sent Successfully!</p>
-                <p className="text-sm text-slate-500 mt-1">{formatMoney(toBaseCurrency(parseFloat(amount || "0"), currency), currency)} to {email}</p>
+                <p className="text-sm text-slate-500 mt-1">{formatMoney(toBaseCurrency(parseFloat(amount || "0"), currency), currency)} to {displayRecipient(selectedPerson, email)}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -359,8 +361,8 @@ export function SendSheet({ open, currency, balance, userCards, people, kycStatu
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-black text-black">{selectedPerson?.fullName || email}</p>
-                        <p className="truncate text-xs font-bold text-zinc-500">{selectedPerson?.email || "Confirm recipient before sending"}</p>
+                        <p className="truncate text-sm font-black text-black">{displayRecipient(selectedPerson, email)}</p>
+                        <p className="truncate text-xs font-bold text-zinc-500">Confirm recipient before sending</p>
                       </div>
                     </div>
                   </div>

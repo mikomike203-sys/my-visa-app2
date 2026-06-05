@@ -174,7 +174,7 @@ export function MoreSheet({
                         )}
                       </div>
                       <p className="truncate text-xs font-black text-black">{person.fullName}</p>
-                      <p className="truncate text-[10px] font-bold text-slate-500">{person.email}</p>
+                      <p className="truncate text-[10px] font-bold text-slate-500">Visa profile</p>
                     </div>
                   ))}
                   {people.length === 0 && <p className="text-xs font-bold text-slate-500">No people found yet.</p>}
