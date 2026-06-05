@@ -33,6 +33,8 @@ function getGreeting(): string {
 function App() {
   const { user, profile, loading, logout, refreshProfile } = useAuth();
   const [authPage, setAuthPage] = useState<"landing" | "login" | "register">("landing");
+  const [showWalletSplash, setShowWalletSplash] = useState(false);
+  const [hasShownWalletSplash, setHasShownWalletSplash] = useState(false);
   const [activeTab, setActiveTab] = useState("home");
   const [showSend, setShowSend] = useState(false);
   const [showReceive, setShowReceive] = useState(false);
@@ -70,6 +72,21 @@ function App() {
   useEffect(() => {
     if (user) loadUserData();
   }, [user, loadUserData]);
+
+  useEffect(() => {
+    if (!user) {
+      setHasShownWalletSplash(false);
+      setShowWalletSplash(false);
+      return;
+    }
+    if (loading || hasShownWalletSplash) return;
+    setShowWalletSplash(true);
+    const timer = window.setTimeout(() => {
+      setShowWalletSplash(false);
+      setHasShownWalletSplash(true);
+    }, 3300);
+    return () => window.clearTimeout(timer);
+  }, [hasShownWalletSplash, loading, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -255,18 +272,41 @@ function App() {
     }
   }, [userCards]);
 
-  if (loading) {
-    return (
-      <div className="min-h-dvh bg-[#f7f7f4] flex items-center justify-center p-6">
-        <div className="w-full max-w-sm rounded-[28px] border border-black bg-white p-8 text-center shadow-[8px_8px_0_#000]">
-          <div className="relative mx-auto mb-5 h-20 w-32 overflow-hidden rounded-2xl border border-black bg-gradient-to-br from-black via-zinc-800 to-blue-700">
-            <motion.div className="absolute inset-y-[-50%] -left-10 w-10 rotate-12 bg-white/40 blur-md" animate={{ left: ["-40px", "150px"] }} transition={{ duration: 1, repeat: Infinity, repeatDelay: 0.8 }} />
-          </div>
-          <p className="text-lg font-black text-black">Opening your wallet</p>
-          <p className="mt-2 text-sm font-bold text-zinc-500">Syncing balance, cards, and session</p>
-        </div>
-      </div>
-    );
+  const walletSplash = (
+    <div className="min-h-dvh bg-black flex items-center justify-center overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0, scale: 1.03 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 1.02 }}
+        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        className="relative h-dvh w-full max-w-[430px] bg-black"
+      >
+        <img
+          src="/vv.jpg"
+          alt="Introducing the future"
+          className="h-full w-full object-cover"
+          loading="eager"
+          decoding="sync"
+        />
+        <motion.div
+          className="absolute inset-x-8 bottom-[max(28px,env(safe-area-inset-bottom))] h-1 overflow-hidden rounded-full bg-white/25"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+        >
+          <motion.div
+            className="h-full rounded-full bg-white"
+            initial={{ width: "0%" }}
+            animate={{ width: "100%" }}
+            transition={{ duration: 3.3, ease: "linear" }}
+          />
+        </motion.div>
+      </motion.div>
+    </div>
+  );
+
+  if (loading || showWalletSplash) {
+    return walletSplash;
   }
 
   if (isAdminRoute()) {
